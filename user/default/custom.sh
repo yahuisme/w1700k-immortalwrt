@@ -6,14 +6,25 @@ echo "=============================================="
 echo "Running custom commands"
 
 # -------------------------------------------------
-# Install W1700K-specific packages not in ImmortalWrt
+# Fetch W1700K-specific packages from OpenW1700k
 # -------------------------------------------------
 # luci-app-wifi7 / luci-app-mlo / luci-app-airoha-npu /
-# luci-app-airoha-flowsense / luci-app-w1700k-fancontrol
-# are vendored from the OpenW1700k fork into $DK_PROFILE/package.
-if [ -d "$DK_PROFILE/package" ]; then
-    cp -r "$DK_PROFILE/package/." package/
+# luci-app-airoha-flowsense / luci-app-w1700k-fancontrol / fastfetch
+# are not available in ImmortalWrt feeds. Follow the OpenW1700k ubi2
+# branch at build time (no version pinning).
+FORK=/tmp/openw1700k
+if ! git clone --depth=1 --filter=blob:none --sparse --branch ubi2 \
+    https://github.com/OpenWRT-fanboy/OpenW1700k.git "$FORK"; then
+    echo "ERROR: Failed to clone OpenW1700k fork!"
+    exit 1
 fi
+git -C "$FORK" sparse-checkout set \
+    package/luci-app-wifi7 package/luci-app-mlo package/luci-app-airoha-npu \
+    package/luci-app-airoha-flowsense package/luci-app-w1700k-fancontrol \
+    package/fastfetch
+cp -r "$FORK/package/luci-app-wifi7" "$FORK/package/luci-app-mlo" \
+      "$FORK/package/luci-app-airoha-npu" "$FORK/package/luci-app-airoha-flowsense" \
+      "$FORK/package/luci-app-w1700k-fancontrol" "$FORK/package/fastfetch" package/
 
 
 # -------------------------------------------------
