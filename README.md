@@ -2,7 +2,7 @@
 
 适用于 **Quantum Fiber W1700K** 路由器的定制 ImmortalWrt 固件构建项目。
 
-本项目基于 [w1700k/builds](https://github.com/w1700k/builds) 的构建框架，源码基线为 [ImmortalWrt 官方 snapshot（master）](https://github.com/immortalwrt/immortalwrt)，内置应用、配置与汉化与 [w1700k-openwrt](https://github.com/yahuisme/w1700k-openwrt) 项目保持一致（值守式系统升级除外，见文末说明）。
+本项目基于 [w1700k/builds](https://github.com/w1700k/builds) 的构建框架，源码基线为 [ImmortalWrt 官方 snapshot（master）](https://github.com/immortalwrt/immortalwrt)，内置应用、配置与汉化与 [w1700k-openwrt](https://github.com/yahuisme/w1700k-openwrt) 项目保持一致（值守式系统升级除外）。
 
 > ⚠️ **仅适用于 Quantum Fiber W1700K，请勿刷入其他型号设备。**
 
@@ -74,5 +74,4 @@ W1700K-Immortalwrt_<构建时间>_r<版本号>
 
 ## 说明
 
-- 与 w1700k-openwrt 的差异：源码基线为 ImmortalWrt 官方 snapshot（master），其余内置应用、默认配置与汉化一致；值守式系统升级未移植（非官方默认应用），irqbalance 采用上游自带汉化（上游已重写）。
-- 软件源指向 ImmortalWrt 官方快照（downloads.immortalwrt.org）；官方 an7581 快照的内核模块仓库暂未加入，待官方构建器升级至 6.18 后按需补充。
+- 与 w1700k-openwrt 的差异：源码基线为 ImmortalWrt 官方 snapshot（master），其余内置应用、默认配置与汉化一致。
