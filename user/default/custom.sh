@@ -55,6 +55,17 @@ if [ -d package/luci-app-airoha-flowsense ] && [ -f $DK_PROFILE/patches/998-flow
     patch -d package/luci-app-airoha-flowsense -p1 --ignore-whitespace < $DK_PROFILE/patches/998-flowsense-i18n.patch
 fi
 
+# -------------------------------------------------
+# SPI-NAND stability: 50MHz -> 33MHz (OpenW1700k fix)
+# -------------------------------------------------
+if grep -q 'spi-max-frequency = <50000000>' target/linux/airoha/dts/an7581.dtsi 2>/dev/null; then
+    sed -i 's/spi-max-frequency = <50000000>/spi-max-frequency = <33000000>/' \
+        target/linux/airoha/dts/an7581.dtsi
+    echo "spi-nand clock lowered to 33MHz"
+else
+    echo "WARN: spi-max-frequency not found in an7581.dtsi; skip"
+fi
+
 # ImmortalWrt's luci-app-irqbalance was rewritten upstream: its view no
 # longer contains the raw row.tail string, and the feed already ships a
 # complete zh_Hans translation for the new UI. The legacy i18n patch and
