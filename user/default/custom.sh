@@ -41,7 +41,7 @@ cp -r "$FORK/package/luci-app-wifi7" "$FORK/package/luci-app-mlo" \
 
 mkdir -p feeds/luci/modules/luci-mod-status/patches
 
-mv $DK_PROFILE/patches/998-single-wiphy.patch \
+cp -f $DK_PROFILE/patches/998-single-wiphy.patch \
     feeds/luci/modules/luci-mod-status/patches/998-single-wiphy.patch
 
 if [ -d package/luci-app-wifi7 ] && [ -f $DK_PROFILE/patches/998-wifi7-i18n.patch ]; then
@@ -168,13 +168,19 @@ fi
 # its PLL fallback path (W1700K ATF lacks the AVS SMC handler).
 # OpenW1700k carries these regs in an7581.dtsi; add them if absent.
 DTSI=target/linux/airoha/dts/an7581.dtsi
-if ! grep -q 'reg-names = "chip-scu", "mcucfg"' "$DTSI" 2>/dev/null; then
+if grep -q 'reg-names = "chip-scu", "mcucfg"' "$DTSI" 2>/dev/null; then
+    echo "cpufreq node regs already present"
+elif grep -q '^[[:space:]]*cpufreq: cpufreq {' "$DTSI" 2>/dev/null; then
     sed -i '/^[[:space:]]*cpufreq: cpufreq {$/a\
 \t\treg = <0x0 0x1fa20000 0x0 0x2c0>, <0x0 0x1efbe000 0x0 0x800>;\
 \t\treg-names = "chip-scu", "mcucfg";' "$DTSI"
-    echo "cpufreq node regs added (chip-scu/mcucfg)"
+    if grep -q 'reg-names = "chip-scu", "mcucfg"' "$DTSI"; then
+        echo "cpufreq node regs added (chip-scu/mcucfg)"
+    else
+        echo "WARN: cpufreq regs injection failed; skip"
+    fi
 else
-    echo "cpufreq node regs already present"
+    echo "WARN: cpufreq node not found in an7581.dtsi; skip"
 fi
 
 # ImmortalWrt's luci-app-irqbalance was rewritten upstream: its view no
@@ -325,7 +331,11 @@ if [ -f "$TTYD_MENU" ]; then
     sed -i 's#admin/system/ttyd#admin/services/ttyd#g' "$TTYD_MENU"
     sed -i 's/^\([[:space:]]*"admin\/services\/ttyd": {\)$/\1\
     "order": 91,/' "$TTYD_MENU"
-    echo "ttyd menu moved to Services (order 91)"
+    if grep -q '"admin/services/ttyd"' "$TTYD_MENU" && grep -q '"order": 91,' "$TTYD_MENU"; then
+        echo "ttyd menu moved to Services (order 91)"
+    else
+        echo "WARN: ttyd menu sed did not match; skip"
+    fi
 else
     echo "WARN: ttyd menu file not found; skip"
 fi
@@ -335,7 +345,11 @@ fi
 IRQ_PO="feeds/luci/applications/luci-app-irqbalance/po/zh_Hans/irqbalance.po"
 if [ -f "$IRQ_PO" ]; then
     sed -i '/^msgid "irqbalance"$/{n;s/^msgstr "irqbalance"$/msgstr "IRQ 平衡"/}' "$IRQ_PO"
-    echo "irqbalance menu title localized (IRQ 平衡)"
+    if grep -q 'msgstr "IRQ 平衡"' "$IRQ_PO"; then
+        echo "irqbalance menu title localized (IRQ 平衡)"
+    else
+        echo "WARN: irqbalance zh_Hans msgid not found; skip"
+    fi
 else
     echo "WARN: irqbalance zh_Hans PO not found; skip"
 fi
