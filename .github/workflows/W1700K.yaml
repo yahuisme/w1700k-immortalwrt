@@ -118,7 +118,7 @@ jobs:
       if: success()
       run: |
         for p in dlcache. cache-${{ matrix.target }}.; do
-          gh cache list --json key,id --jq '.[] | select(.key | startswith("'\"$p\"'")) | .id' | xargs -r gh cache delete
+          gh cache list --json key,id --jq '.[] | select(.key | startswith("'"$p"'")) | .id' | xargs -r gh cache delete
         done ||:
 
     - uses: actions/cache/save@v5
