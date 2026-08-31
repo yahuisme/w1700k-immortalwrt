@@ -121,6 +121,20 @@ if [ -f "$DK_PROFILE/patches/999-fix-txpower-list.patch" ]; then
 fi
 
 # -------------------------------------------------
+# OC overclock: CPU OPP to 1.4GHz (ubi2-oc profile only)
+# Triggered by performance governor in config.diff
+# -------------------------------------------------
+if grep -q '^CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y' .config 2>/dev/null; then
+    if [ -f "$DK_PROFILE/patches/001-oc-cpu-opp-1400mhz.patch" ]; then
+        patch -p1 --ignore-whitespace \
+            < "$DK_PROFILE/patches/001-oc-cpu-opp-1400mhz.patch"
+        echo "OC OPP patch applied (1.4GHz)"
+    else
+        echo "WARN: OC profile but OPP patch missing; skip"
+    fi
+fi
+
+# -------------------------------------------------
 # LED status colors (follow OpenW1700k: boot=green, failsafe=red, running=white)
 # -------------------------------------------------
 DTS=target/linux/airoha/dts/an7581-w1700k-ubi.dts
