@@ -66,6 +66,26 @@ else
     echo "WARN: spi-max-frequency not found in an7581.dtsi; skip"
 fi
 
+# -------------------------------------------------
+# W1700K platform fixes from OpenW1700k (quilt-applied)
+# 745 pcs E2 calib / 746 mt7530 reset / 916-02 GRO_HW /
+# 992-20 stability / 117-03 npu timeout / 910-02 usb-pcie clk /
+# 998 log silence / 9990 hw gro state
+# -------------------------------------------------
+for p in 745-net-pcs-airoha-extend-manual-rx-calib-to-E2-silicon.patch \
+         746-net-dsa-mt7530-pre-deassert-phy-reset-gpios-before-mdio-scan.patch \
+         916-02-net-airoha-Implement-HW-GRO-TCP-support.patch \
+         992-20-net-airoha-stability.patch \
+         117-03-airoha_npu_eagle_add_ser.patch \
+         910-02-usb-pcie.patch \
+         998-silence-PHY-LED-pinctrl-error.patch \
+         9990-net-airoha-share-hw-gro-state-across-qdma-users.patch; do
+    if [ -f "$DK_PROFILE/patches/$p" ]; then
+        cp -f "$DK_PROFILE/patches/$p" target/linux/airoha/patches-6.18/
+        echo "platform patch: $p"
+    fi
+done
+
 # ImmortalWrt's luci-app-irqbalance was rewritten upstream: its view no
 # longer contains the raw row.tail string, and the feed already ships a
 # complete zh_Hans translation for the new UI. The legacy i18n patch and
