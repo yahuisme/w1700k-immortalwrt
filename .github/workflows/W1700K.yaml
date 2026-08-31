@@ -66,7 +66,6 @@ jobs:
           git remote set-url origin $REPO_URL 2>&- || git remote add origin $REPO_URL
           git fetch && git checkout $REPO_BRANCH && git pull --rebase
           mountpoint $DK_BIN || { echo "::error::not mounted" >&2; exit 1; }
-          git log -1 --oneline > $DK_BIN/build_info
           ln -sf $DK_BIN bin && ln -sf /dlcache dl && ln -sf /stcache staging_dir
           bp=$DK_PROFILE fc=feeds.conf
           cp $bp/$fc $fc 2>&- && cp $fc /tmp/feeds.bak
@@ -84,7 +83,6 @@ jobs:
       run: |
         for mode in c s; do
           docker_exec -e MODE=$mode DK bash -e -c '
-            bash $DK_PROFILE/pre_compile.sh 2>&- ||:
             cd $DK_OPENWRT
             export FORCE_UNSAFE_CONFIGURE=1 CCACHE_SLOPPINESS=file_stat_matches,include_file_mtime,time_macros CCACHE_NOHASHDIR=true CCACHE_COMPILERCHECK=content
             make -j$(($(nproc) + 1)) V=$MODE
@@ -95,7 +93,7 @@ jobs:
     - name: Create release
       run: |
         sudo chown -R "$(id -u):$(id -g)" openwrt_bin stcache
-        find -L openwrt_bin/targets/*/* -maxdepth 1 -type f -exec install -D -t firmware {} +
+        find -L openwrt_bin/targets/*/* -maxdepth 1 \( -name '*sysupgrade.itb' -o -name 'profiles.json' \) -exec install -D -t firmware {} +
         VERSION="W1700K-Immortalwrt_$(TZ=Asia/Hong_Kong date +'%y.%m.%d-%H.%M.%S')_r$(jq -r '.version_code' firmware/profiles.json | sed 's/^r//; s/-.*//')"
         RELEASE_NOTES="$RUNNER_TEMP/release-notes.md"
         cat > "$RELEASE_NOTES" <<EOF
@@ -124,6 +122,6 @@ jobs:
     - uses: actions/cache/save@v5
       if: success()
       with: {path: "ghcache\nstcache", key: '${{ steps.gh.outputs.cache-primary-key }}'}
-    - if: ${{ matrix.target == 'ubi2' && success() }}
-      uses: actions/cache/save@v5
+    - uses: actions/cache/save@v5
+      if: success()
       with: {path: dlcache, key: '${{ steps.dl.outputs.cache-primary-key }}'}
