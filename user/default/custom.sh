@@ -88,13 +88,12 @@ done
 
 # -------------------------------------------------
 # mt7996 wifi patches from OpenW1700k (mt76 package)
-# 0005 txfree guard / 0010 txpower limit control /
+# 0010 txpower limit control /
 # 0011 refresh power limits / 0014 HW_RRO release
 # -------------------------------------------------
 mkdir -p package/kernel/mt76/patches
 
-for p in 0005-wifi-mt76-mt7996-guard-txfree-overrun.patch \
-         0010-enable-firmware-txpower-limit.patch \
+for p in 0010-enable-firmware-txpower-limit.patch \
          0011-refresh-power-limits-on-txpower-changes.patch \
          0014-wifi-mt76-mt7996-release-HW_RRO-sessions-on-teardown.patch; do
     if [ -f "$DK_PROFILE/patches/$p" ]; then
