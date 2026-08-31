@@ -87,6 +87,23 @@ for p in 745-net-pcs-airoha-extend-manual-rx-calib-to-E2-silicon.patch \
 done
 
 # -------------------------------------------------
+# mt7996 wifi patches from OpenW1700k (mt76 package)
+# 0005 txfree guard / 0010 txpower limit control /
+# 0011 refresh power limits / 0014 HW_RRO release
+# -------------------------------------------------
+mkdir -p package/kernel/mt76/patches
+
+for p in 0005-wifi-mt76-mt7996-guard-txfree-overrun.patch \
+         0010-enable-firmware-txpower-limit.patch \
+         0011-refresh-power-limits-on-txpower-changes.patch \
+         0014-wifi-mt76-mt7996-release-HW_RRO-sessions-on-teardown.patch; do
+    if [ -f "$DK_PROFILE/patches/$p" ]; then
+        cp -f "$DK_PROFILE/patches/$p" package/kernel/mt76/patches/
+        echo "mt76 patch: $p"
+    fi
+done
+
+# -------------------------------------------------
 # LED status colors (follow OpenW1700k: boot=green, failsafe=red, running=white)
 # -------------------------------------------------
 DTS=target/linux/airoha/dts/an7581-w1700k-ubi.dts
