@@ -30,9 +30,9 @@ cp -r "$FORK/package/luci-app-wifi7" "$FORK/package/luci-app-mlo" \
 # Existing W1700K custom files
 # -------------------------------------------------
 
-# Attended sysupgrade (luci-app-attendedsysupgrade / owut) is not an
-# official default app in ImmortalWrt and is intentionally omitted, so
-# no overview.js replacement or extra strings are applied here.
+# Attended sysupgrade follows the official snapshot: attendedsysupgrade-common
+# and owut are built in (no LuCI interface), so no overview.js replacement or
+# extra strings are applied here.
 
 mkdir -p feeds/luci/modules/luci-mod-status/patches
 
@@ -159,8 +159,8 @@ done
 # luci-app-irqbalance ships its own zh_Hans translation in the ImmortalWrt
 # luci feed (see note above), so no PO is copied from files/po/zh_Hans.
 
-# Attended sysupgrade was removed (not an official ImmortalWrt default
-# app), so no custom attendedsysupgrade strings are appended.
+# Attended sysupgrade matches the official snapshot (attendedsysupgrade-common
+# + owut, CLI only), so no custom attendedsysupgrade strings are appended.
 
 # The temperature & fan overview widget ships as 15_temperature.js inside
 # luci-mod-status. Core modules translate via luci-base's "base" domain, so
