@@ -86,6 +86,20 @@ for p in 745-net-pcs-airoha-extend-manual-rx-calib-to-E2-silicon.patch \
     fi
 done
 
+# -------------------------------------------------
+# LED status colors (follow OpenW1700k: boot=green, failsafe=red, running=white)
+# -------------------------------------------------
+DTS=target/linux/airoha/dts/an7581-w1700k-ubi.dts
+if grep -q 'led-boot = &led_status_red;' "$DTS" 2>/dev/null; then
+    sed -i -e 's/led-boot = &led_status_red;/led-boot = \&led_status_green;/' \
+           -e 's/led-failsafe = &led_status_blue;/led-failsafe = \&led_status_red;/' \
+           -e 's/led-running = &led_status_green;/led-running = \&led_status_white;/' \
+        "$DTS"
+    echo "LED status colors set (boot=green, failsafe=red, running=white)"
+else
+    echo "WARN: LED aliases not found in an7581-w1700k-ubi.dts; skip"
+fi
+
 # ImmortalWrt's luci-app-irqbalance was rewritten upstream: its view no
 # longer contains the raw row.tail string, and the feed already ships a
 # complete zh_Hans translation for the new UI. The legacy i18n patch and
