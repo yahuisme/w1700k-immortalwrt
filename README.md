@@ -2,7 +2,7 @@
 
 适用于 **Quantum Fiber W1700K** 路由器的定制 ImmortalWrt 固件构建项目。
 
-本项目基于 [w1700k/builds](https://github.com/w1700k/builds) 的构建框架，源码基线为 [ImmortalWrt 官方 snapshot（master）](https://github.com/immortalwrt/immortalwrt)，内置应用、配置与汉化与 [w1700k-openwrt](https://github.com/yahuisme/w1700k-openwrt) 项目保持一致（值守式系统升级除外）。
+基于 [w1700k/builds](https://github.com/w1700k/builds) 构建框架，源码基线为 [ImmortalWrt 官方 snapshot](https://github.com/immortalwrt/immortalwrt)，内置应用、配置与汉化与 [w1700k-openwrt](https://github.com/yahuisme/w1700k-openwrt) 保持一致（值守式系统升级界面除外）。
 
 > ⚠️ **仅适用于 Quantum Fiber W1700K，请勿刷入其他型号设备。**
 
@@ -11,13 +11,9 @@
 ## ✨ 主要特性
 
 - 📝 内置专属应用已添加中文汉化
-- 🎨 内置 Aurora LuCI 主题为默认主题
+- 🎨 默认 Aurora LuCI 主题
 - 🕐 系统时区：香港（UTC+8）
-- 📡 默认开启 2.4 GHz / 5 GHz Wi-Fi
-- 📡 默认不开启 6 GHz Wi-Fi
 - 🌡️ LuCI 首页增加设备温度及风扇转速显示
-- 🔄 每日自动构建最新固件
-- 📦 提供 `ubi2` 常规版本
 
 ---
 
@@ -58,9 +54,3 @@ GitHub Actions 每日 **香港时间 17:00** 自动构建：
 ```text
 W1700K-Immortalwrt_<构建时间>_r<版本号>
 ```
-
----
-
-## 说明
-
-- 与 w1700k-openwrt 的差异：源码基线为 ImmortalWrt 官方 snapshot（master），其余内置应用、默认配置与汉化一致。
