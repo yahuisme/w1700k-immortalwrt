@@ -91,13 +91,17 @@ done
 
 # -------------------------------------------------
 # mt7996 wifi patches from OpenW1700k (mt76 package)
-# 0010 txpower limit control /
-# 0011 refresh power limits / 0014 HW_RRO release
+# 0001 token/NPU debugfs / 0003 station stats via MCU /
+# 0010 txpower limit control / 0011 refresh power limits /
+# 0013 HW_RRO struct fix / 0014 HW_RRO release
 # -------------------------------------------------
 mkdir -p package/kernel/mt76/patches
 
-for p in 0010-enable-firmware-txpower-limit.patch \
+for p in 0001-wifi-mt76-mt7996-add-token-and-NPU-debugfs-counters.patch \
+         0003-wifi-mt76-mt7996-replace-direct-WTBL-access-with-MCU-for-station-statistics.patch \
+         0010-enable-firmware-txpower-limit.patch \
          0011-refresh-power-limits-on-txpower-changes.patch \
+         0013-wifi-mt76-mt7996-fix-HW_RRO-delete-event-structure-size.patch \
          0014-wifi-mt76-mt7996-release-HW_RRO-sessions-on-teardown.patch; do
     if [ -f "$DK_PROFILE/patches/$p" ]; then
         cp -f "$DK_PROFILE/patches/$p" package/kernel/mt76/patches/
