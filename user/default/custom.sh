@@ -27,6 +27,46 @@ cp -r "$FORK/package/luci-app-wifi7" "$FORK/package/luci-app-mlo" \
 
 
 # -------------------------------------------------
+# Sync W1700K platform patches from OpenW1700k ubi2 (dynamic, follows upstream)
+# -------------------------------------------------
+# airoha target patches + W1700K DTS + mt76 patches/Makefile. ImmortalWrt's
+# own build core (config-6.18 / target.mk / image/*) stays official; synced
+# patches that no longer apply cleanly are skipped with a warning, not fatal.
+git -C "$FORK" fetch --depth=1 origin main:refs/remotes/origin/main 2>&- ||:
+git -C "$FORK" sparse-checkout set \
+    package/luci-app-wifi7 package/luci-app-mlo package/luci-app-airoha-npu \
+    package/luci-app-airoha-flowsense package/luci-app-w1700k-fancontrol \
+    target/linux/airoha package/kernel/mt76
+
+sync_platform() {
+    local DIR="$1" SKIP_RE="$2" F
+    while IFS= read -r F; do
+        [ -n "$F" ] || continue
+        mkdir -p "$(dirname "$F")"
+        if [ -f "$FORK/$F" ]; then
+            cp -f "$FORK/$F" "$F"
+            echo "platform sync: $F"
+        else
+            echo "WARN: platform file missing upstream: $F"
+        fi
+    done < <(git -C "$FORK" diff --name-status origin/main..ubi2 -- "$DIR" 2>&- | awk '$1 != "D" {print $2}' | grep -Ev "$SKIP_RE")
+}
+
+sync_platform "target/linux/airoha" 'config-6\.18$|target\.mk$|image/'
+sync_platform "package/kernel/mt76" '^$'
+
+# Pre-check synced patches; skip any that fail to apply (quilt applies them later).
+while IFS= read -r P; do
+    [ -n "$P" ] || continue
+    if ! patch -d . -p1 --dry-run --forward < "$P" >/dev/null 2>&1; then
+        echo "WARN: platform patch conflict, skipping: $P"
+        rm -f "$P"
+    fi
+done < <(git -C "$FORK" diff --name-only origin/main..ubi2 -- \
+    target/linux/airoha/patches-6.18 package/kernel/mt76/patches 2>&-)
+
+
+# -------------------------------------------------
 # Existing W1700K custom files
 # -------------------------------------------------
 
