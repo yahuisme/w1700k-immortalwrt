@@ -103,7 +103,6 @@ jobs:
         - 固件分支：\`ubi2\`
         - 构建时间：$(TZ=Asia/Hong_Kong date '+%Y-%m-%d %H:%M:%S %Z')
         - 固件源码：https://github.com/immortalwrt/immortalwrt
-        - 构建项目：https://github.com/yahuisme/w1700k-immortalwrt
         - 本 Release 仅包含 \`sysupgrade.itb\` 升级镜像。
 
         请确认设备为 W1700K，并在刷写前备份当前配置。
