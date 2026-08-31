@@ -70,6 +70,7 @@ fi
 # W1700K platform fixes from OpenW1700k (quilt-applied)
 # 745 pcs E2 calib / 746 mt7530 reset / 916-02 GRO_HW /
 # 992-20 stability / 117-03 npu timeout / 910-02 usb-pcie clk /
+# 939 SMCCC cpufreq / 940 CPU pmdomain (PLL fallback) /
 # 998 log silence / 9990 hw gro state
 # -------------------------------------------------
 for p in 745-net-pcs-airoha-extend-manual-rx-calib-to-E2-silicon.patch \
@@ -78,6 +79,8 @@ for p in 745-net-pcs-airoha-extend-manual-rx-calib-to-E2-silicon.patch \
          992-20-net-airoha-stability.patch \
          117-03-airoha_npu_eagle_add_ser.patch \
          910-02-usb-pcie.patch \
+         939-cpufreq-airoha-Add-EN7581-CPUFreq-SMCCC-driver.patch \
+         940-pmdomain-airoha-Add-Airoha-CPU-PM-Domain-support.patch \
          998-silence-PHY-LED-pinctrl-error.patch \
          9990-net-airoha-share-hw-gro-state-across-qdma-users.patch; do
     if [ -f "$DK_PROFILE/patches/$p" ]; then
@@ -146,6 +149,22 @@ if grep -q 'led-boot = &led_status_red;' "$DTS" 2>/dev/null; then
     echo "LED status colors set (boot=green, failsafe=red, running=white)"
 else
     echo "WARN: LED aliases not found in an7581-w1700k-ubi.dts; skip"
+fi
+
+# -------------------------------------------------
+# CPUFreq: add SCU/MCUCFG register ranges to the cpufreq node
+# -------------------------------------------------
+# The Airoha CPU PM domain driver needs the chip-scu/mcucfg ranges for
+# its PLL fallback path (W1700K ATF lacks the AVS SMC handler).
+# OpenW1700k carries these regs in an7581.dtsi; add them if absent.
+DTSI=target/linux/airoha/dts/an7581.dtsi
+if ! grep -q 'reg-names = "chip-scu", "mcucfg"' "$DTSI" 2>/dev/null; then
+    sed -i '/^[[:space:]]*cpufreq: cpufreq {$/a\
+\t\treg = <0x0 0x1fa20000 0x0 0x2c0>, <0x0 0x1efbe000 0x0 0x800>;\
+\t\treg-names = "chip-scu", "mcucfg";' "$DTSI"
+    echo "cpufreq node regs added (chip-scu/mcucfg)"
+else
+    echo "cpufreq node regs already present"
 fi
 
 # ImmortalWrt's luci-app-irqbalance was rewritten upstream: its view no
@@ -286,6 +305,29 @@ fi
 if [ -f package/luci-app-airoha-flowsense/root/usr/share/luci/menu.d/luci-app-airoha-flowsense.json ]; then
     sed -i 's#"order": 16#"order": 17#' \
         package/luci-app-airoha-flowsense/root/usr/share/luci/menu.d/luci-app-airoha-flowsense.json
+fi
+
+# Move ttyd from the System menu into Services, directly below the
+# irqbalance app (order 90). Only the menu keys and the parent order
+# change; the view paths stay untouched.
+TTYD_MENU="feeds/luci/applications/luci-app-ttyd/root/usr/share/luci/menu.d/luci-app-ttyd.json"
+if [ -f "$TTYD_MENU" ]; then
+    sed -i 's#admin/system/ttyd#admin/services/ttyd#g' "$TTYD_MENU"
+    sed -i 's/^\([[:space:]]*"admin\/services\/ttyd": {\)$/\1\
+    "order": 91,/' "$TTYD_MENU"
+    echo "ttyd menu moved to Services (order 91)"
+else
+    echo "WARN: ttyd menu file not found; skip"
+fi
+
+# The feed's zh_Hans PO leaves the menu title "irqbalance" untranslated.
+# Fix the msgstr in place so the Services menu shows the localized name.
+IRQ_PO="feeds/luci/applications/luci-app-irqbalance/po/zh_Hans/irqbalance.po"
+if [ -f "$IRQ_PO" ]; then
+    sed -i '/^msgid "irqbalance"$/{n;s/^msgstr "irqbalance"$/msgstr "IRQ 平衡"/}' "$IRQ_PO"
+    echo "irqbalance menu title localized (IRQ 平衡)"
+else
+    echo "WARN: irqbalance zh_Hans PO not found; skip"
 fi
 
 echo "Airoha LuCI translations installed successfully."
