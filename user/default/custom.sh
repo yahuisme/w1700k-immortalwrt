@@ -36,23 +36,23 @@ cp -r "$FORK/package/luci-app-wifi7" "$FORK/package/luci-app-mlo" \
 
 mkdir -p feeds/luci/modules/luci-mod-status/patches
 
-mv files/998-single-wiphy.patch \
+mv $DK_PROFILE/patches/998-single-wiphy.patch \
     feeds/luci/modules/luci-mod-status/patches/998-single-wiphy.patch
 
-if [ -d package/luci-app-wifi7 ] && [ -f files/998-wifi7-i18n.patch ]; then
-    patch -d package/luci-app-wifi7 -p1 --ignore-whitespace < files/998-wifi7-i18n.patch
+if [ -d package/luci-app-wifi7 ] && [ -f $DK_PROFILE/patches/998-wifi7-i18n.patch ]; then
+    patch -d package/luci-app-wifi7 -p1 --ignore-whitespace < $DK_PROFILE/patches/998-wifi7-i18n.patch
 fi
 
-if [ -d package/luci-app-w1700k-fancontrol ] && [ -f files/998-fancontrol-i18n.patch ]; then
-    patch -d package/luci-app-w1700k-fancontrol -p1 --ignore-whitespace < files/998-fancontrol-i18n.patch
+if [ -d package/luci-app-w1700k-fancontrol ] && [ -f $DK_PROFILE/patches/998-fancontrol-i18n.patch ]; then
+    patch -d package/luci-app-w1700k-fancontrol -p1 --ignore-whitespace < $DK_PROFILE/patches/998-fancontrol-i18n.patch
 fi
 
-if [ -d package/luci-app-airoha-npu ] && [ -f files/998-npu-i18n.patch ]; then
-    patch -d package/luci-app-airoha-npu -p1 --ignore-whitespace < files/998-npu-i18n.patch
+if [ -d package/luci-app-airoha-npu ] && [ -f $DK_PROFILE/patches/998-npu-i18n.patch ]; then
+    patch -d package/luci-app-airoha-npu -p1 --ignore-whitespace < $DK_PROFILE/patches/998-npu-i18n.patch
 fi
 
-if [ -d package/luci-app-airoha-flowsense ] && [ -f files/998-flowsense-i18n.patch ]; then
-    patch -d package/luci-app-airoha-flowsense -p1 --ignore-whitespace < files/998-flowsense-i18n.patch
+if [ -d package/luci-app-airoha-flowsense ] && [ -f $DK_PROFILE/patches/998-flowsense-i18n.patch ]; then
+    patch -d package/luci-app-airoha-flowsense -p1 --ignore-whitespace < $DK_PROFILE/patches/998-flowsense-i18n.patch
 fi
 
 # ImmortalWrt's luci-app-irqbalance was rewritten upstream: its view no
@@ -141,7 +141,7 @@ translation_targets=(
 for translation_target in "${translation_targets[@]}"; do
     package_name="${translation_target%%|*}"
     target="${translation_target#*|}"
-    translation="files/po/zh_Hans/${package_name}.po"
+    translation="$DK_PROFILE/po/zh_Hans/${package_name}.po"
 
     if [ ! -d "$target" ]; then
         echo "ERROR: Translation target package is missing: $target"
@@ -157,7 +157,7 @@ for translation_target in "${translation_targets[@]}"; do
 done
 
 # luci-app-irqbalance ships its own zh_Hans translation in the ImmortalWrt
-# luci feed (see note above), so no PO is copied from files/po/zh_Hans.
+# luci feed (see note above), so no PO is copied from po/zh_Hans.
 
 # Attended sysupgrade matches the official snapshot (attendedsysupgrade-common
 # + owut, CLI only), so no custom attendedsysupgrade strings are appended.
@@ -166,8 +166,8 @@ done
 # luci-mod-status. Core modules translate via luci-base's "base" domain, so
 # append its strings to the upstream base.po for the Chinese UI.
 BASE_PO="feeds/luci/modules/luci-base/po/zh_Hans/base.po"
-if [ -f "$BASE_PO" ] && [ -f files/po/zh_Hans/base-custom.po ]; then
-    cat files/po/zh_Hans/base-custom.po >> "$BASE_PO"
+if [ -f "$BASE_PO" ] && [ -f $DK_PROFILE/po/zh_Hans/base-custom.po ]; then
+    cat $DK_PROFILE/po/zh_Hans/base-custom.po >> "$BASE_PO"
 fi
 
 # The upstream menu titles omit the vendor prefix. Keep the user-facing
