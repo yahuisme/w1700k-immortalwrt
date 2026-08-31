@@ -104,6 +104,23 @@ for p in 0005-wifi-mt76-mt7996-guard-txfree-overrun.patch \
 done
 
 # -------------------------------------------------
+# Wireless fixes from OpenW1700k (quilt-applied)
+# 555 regdb US 5.8G/6G power / 999 iwinfo txpower list
+# -------------------------------------------------
+mkdir -p package/firmware/wireless-regdb/patches
+mkdir -p package/network/utils/iwinfo/patches
+
+if [ -f "$DK_PROFILE/patches/555-w1700k-fix.patch" ]; then
+    cp -f "$DK_PROFILE/patches/555-w1700k-fix.patch" package/firmware/wireless-regdb/patches/
+    echo "regdb patch: 555-w1700k-fix.patch"
+fi
+
+if [ -f "$DK_PROFILE/patches/999-fix-txpower-list.patch" ]; then
+    cp -f "$DK_PROFILE/patches/999-fix-txpower-list.patch" package/network/utils/iwinfo/patches/
+    echo "iwinfo patch: 999-fix-txpower-list.patch"
+fi
+
+# -------------------------------------------------
 # LED status colors (follow OpenW1700k: boot=green, failsafe=red, running=white)
 # -------------------------------------------------
 DTS=target/linux/airoha/dts/an7581-w1700k-ubi.dts
