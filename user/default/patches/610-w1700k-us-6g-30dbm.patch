@@ -1,0 +1,8 @@
+--- a/db.txt
++++ b/db.txt
+@@ -2091,5 +2091,5 @@
+ 	# 6g band
+ 	# https://www.federalregister.gov/documents/2020/05/26/2020-11236/unlicensed-use-of-the-6ghz-band
+-	(5925 - 7125 @ 320), (12), NO-OUTDOOR, NO-IR
++	(5925 - 7125 @ 320), (30), NO-OUTDOOR
+ 	# 60g band
