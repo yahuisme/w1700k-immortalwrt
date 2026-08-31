@@ -61,6 +61,6 @@ LuCI 状态首页显示 CPU、主板、10G WAN/LAN PHY、2.4/5/6 GHz WiFi 温度
 GitHub Actions 每日 **香港时间 17:00** 自动构建：
 
 ```text
-W1700K-Immortalwrt_<构建时间>_r<版本号>
-W1700K-OC-Immortalwrt_<构建时间>_r<版本号>
+W1700K-Immortalwrt_<构建时间>_r<版本号>  推荐版本。使用标准 CPU 工作参数，优先保障稳定性，适合绝大多数 W1700K 用户日常使用。
+W1700K-OC-Immortalwrt_<构建时间>_r<版本号>  超频版本：默认性能模式并超频 +200 MHz。
 ```
