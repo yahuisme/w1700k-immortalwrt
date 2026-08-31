@@ -6,12 +6,15 @@ echo "=============================================="
 echo "Running custom commands"
 
 # -------------------------------------------------
-# Fetch W1700K-specific packages from OpenW1700k
+# Fetch W1700K-specific packages and patches from OpenW1700k
 # -------------------------------------------------
 # luci-app-wifi7 / luci-app-mlo / luci-app-airoha-npu /
 # luci-app-airoha-flowsense / luci-app-w1700k-fancontrol
-# are not available in ImmortalWrt feeds. Follow the OpenW1700k ubi2
-# branch at build time (no version pinning).
+# are not available in ImmortalWrt feeds. Platform / mt76 / iwinfo
+# patches are also taken from the fork at build time so they always
+# track upstream latest (same model as the w1700k-openwrt builds that
+# use the fork tree directly). Follow the OpenW1700k ubi2 branch at
+# build time (no version pinning).
 FORK=/tmp/openw1700k
 if ! git clone --depth=1 --filter=blob:none --sparse --branch ubi2 \
     https://github.com/OpenWRT-fanboy/OpenW1700k.git "$FORK"; then
@@ -20,7 +23,9 @@ if ! git clone --depth=1 --filter=blob:none --sparse --branch ubi2 \
 fi
 git -C "$FORK" sparse-checkout set \
     package/luci-app-wifi7 package/luci-app-mlo package/luci-app-airoha-npu \
-    package/luci-app-airoha-flowsense package/luci-app-w1700k-fancontrol
+    package/luci-app-airoha-flowsense package/luci-app-w1700k-fancontrol \
+    target/linux/airoha/patches-6.18 package/kernel/mt76 \
+    package/network/utils/iwinfo/patches
 cp -r "$FORK/package/luci-app-wifi7" "$FORK/package/luci-app-mlo" \
       "$FORK/package/luci-app-airoha-npu" "$FORK/package/luci-app-airoha-flowsense" \
       "$FORK/package/luci-app-w1700k-fancontrol" package/
@@ -69,50 +74,48 @@ fi
 # -------------------------------------------------
 # W1700K platform fixes from OpenW1700k (quilt-applied)
 # 745 pcs E2 calib / 746 mt7530 reset / 916-02 GRO_HW /
-# 992-20 stability / 117-03 npu timeout / 910-02 usb-pcie clk /
+# 992-20 stability / 117-03 npu timeout / 992-21 npu init stability /
+# 910-02 usb-pcie clk /
 # 939 SMCCC cpufreq / 940 CPU pmdomain (PLL fallback) /
 # 998 log silence / 9990 hw gro state
+# Copied from the fork at build time to track upstream latest.
 # -------------------------------------------------
 for p in 745-net-pcs-airoha-extend-manual-rx-calib-to-E2-silicon.patch \
          746-net-dsa-mt7530-pre-deassert-phy-reset-gpios-before-mdio-scan.patch \
          916-02-net-airoha-Implement-HW-GRO-TCP-support.patch \
          992-20-net-airoha-stability.patch \
+         992-21-net-airoha-npu-init-stability.patch \
          117-03-airoha_npu_eagle_add_ser.patch \
          910-02-usb-pcie.patch \
          939-cpufreq-airoha-Add-EN7581-CPUFreq-SMCCC-driver.patch \
          940-pmdomain-airoha-Add-Airoha-CPU-PM-Domain-support.patch \
          998-silence-PHY-LED-pinctrl-error.patch \
          9990-net-airoha-share-hw-gro-state-across-qdma-users.patch; do
-    if [ -f "$DK_PROFILE/patches/$p" ]; then
-        cp -f "$DK_PROFILE/patches/$p" target/linux/airoha/patches-6.18/
+    if [ -f "$FORK/target/linux/airoha/patches-6.18/$p" ]; then
+        cp -f "$FORK/target/linux/airoha/patches-6.18/$p" target/linux/airoha/patches-6.18/
         echo "platform patch: $p"
+    else
+        echo "ERROR: patch not found in OpenW1700k fork: $p"
+        exit 1
     fi
 done
 
 # -------------------------------------------------
-# mt7996 wifi patches from OpenW1700k (mt76 package)
-# 0001 token/NPU debugfs / 0003 station stats via MCU /
-# 0010 txpower limit control / 0011 refresh power limits /
-# 0013 HW_RRO struct fix / 0014 HW_RRO release
+# mt76 package from OpenW1700k (version + patches)
 # -------------------------------------------------
-mkdir -p package/kernel/mt76/patches
-
-for p in 0001-wifi-mt76-mt7996-add-token-and-NPU-debugfs-counters.patch \
-         0003-wifi-mt76-mt7996-replace-direct-WTBL-access-with-MCU-for-station-statistics.patch \
-         0010-enable-firmware-txpower-limit.patch \
-         0011-refresh-power-limits-on-txpower-changes.patch \
-         0013-wifi-mt76-mt7996-fix-HW_RRO-delete-event-structure-size.patch \
-         0014-wifi-mt76-mt7996-release-HW_RRO-sessions-on-teardown.patch; do
-    if [ -f "$DK_PROFILE/patches/$p" ]; then
-        cp -f "$DK_PROFILE/patches/$p" package/kernel/mt76/patches/
-        echo "mt76 patch: $p"
-    fi
-done
+# Use the fork's mt76 package wholesale (pinned mt76-firmware snapshot
+# plus its in-tree patches) instead of ImmortalWrt's older snapshot with
+# individually ported patches. This is the same tested combo as the
+# w1700k-openwrt builds on kernel 6.18.44, and it removes the
+# version-mismatch class of patch issues entirely.
+rm -rf package/kernel/mt76
+cp -r "$FORK/package/kernel/mt76" package/kernel/mt76
+echo "mt76 package replaced with OpenW1700k version"
 
 # -------------------------------------------------
 # Wireless fixes (quilt-applied)
-# 610 US 6G 30dBm (applied after official 500/600) /
-# 999 iwinfo txpower list
+# 610 US 6G 30dBm (self-maintained, applied after official 500/600) /
+# 999 iwinfo txpower list (from the fork at build time)
 # -------------------------------------------------
 mkdir -p package/firmware/wireless-regdb/patches
 mkdir -p package/network/utils/iwinfo/patches
@@ -122,9 +125,12 @@ if [ -f "$DK_PROFILE/patches/610-w1700k-us-6g-30dbm.patch" ]; then
     echo "regdb patch: 610-w1700k-us-6g-30dbm.patch"
 fi
 
-if [ -f "$DK_PROFILE/patches/999-fix-txpower-list.patch" ]; then
-    cp -f "$DK_PROFILE/patches/999-fix-txpower-list.patch" package/network/utils/iwinfo/patches/
+if [ -f "$FORK/package/network/utils/iwinfo/patches/999-fix-txpower-list.patch" ]; then
+    cp -f "$FORK/package/network/utils/iwinfo/patches/999-fix-txpower-list.patch" package/network/utils/iwinfo/patches/
     echo "iwinfo patch: 999-fix-txpower-list.patch"
+else
+    echo "ERROR: patch not found in OpenW1700k fork: 999-fix-txpower-list.patch"
+    exit 1
 fi
 
 # -------------------------------------------------
