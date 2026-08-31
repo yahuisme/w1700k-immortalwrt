@@ -101,8 +101,6 @@ jobs:
         cat > "$RELEASE_NOTES" <<EOF
         ## Quantum Fiber / Gemtek W1700K ImmortalWrt — ubi2 标准版
 
-        **推荐版本。** 基于 ImmortalWrt 官方 snapshot（master 分支）构建，使用标准 CPU 工作参数，优先保障稳定性，适合绝大多数 W1700K 用户日常使用。
-
         - 机型：Quantum Fiber / Gemtek W1700K
         - 固件分支：\`ubi2\`
         - 构建时间：$(TZ=Asia/Hong_Kong date '+%Y-%m-%d %H:%M:%S %Z')
