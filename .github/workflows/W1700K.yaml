@@ -97,7 +97,7 @@ jobs:
         sudo chown -R "$(id -u):$(id -g)" openwrt_bin stcache
         find -L openwrt_bin/targets/*/* -maxdepth 1 \( -name '*sysupgrade.itb' -o -name 'profiles.json' \) -exec install -D -t firmware {} +
         PREFIX="W1700K-Immortalwrt_"
-        [ "${{ matrix.target }}" = "ubi2-oc" ] && PREFIX="W1700K-OC-Immortalwrt_"
+        [ "${{ matrix.target }}" = "ubi2-oc" ] && PREFIX="W1700K-Immortalwrt-OC_"
         VERSION="${PREFIX}$(TZ=Asia/Hong_Kong date +'%y.%m.%d-%H.%M.%S')_r$(jq -r '.version_code' firmware/profiles.json | sed 's/^r//; s/-.*//')"
         echo "$VERSION" > firmware/version.txt
         RELEASE_NOTES="firmware/release-notes.md"
@@ -172,7 +172,7 @@ jobs:
         V_UBI2="$(cat fw-ubi2/version.txt)"
         gh release create "$V_OC" fw-ubi2-oc/*sysupgrade.itb --title "$V_OC" --notes-file fw-ubi2-oc/release-notes.md
         # Remove older ubi2-oc releases, but never the one just created.
-        gh release list --json tagName --jq '.[].tagName' | grep "^W1700K-OC-Immortalwrt_" | grep -vxF "$V_OC" | xargs -r -n1 gh release delete --cleanup-tag -y ||:
+        gh release list --json tagName --jq '.[].tagName' | grep -E "^(W1700K-Immortalwrt-OC_|W1700K-OC-Immortalwrt_)" | grep -vxF "$V_OC" | xargs -r -n1 gh release delete --cleanup-tag -y ||:
         gh release create "$V_UBI2" fw-ubi2/*sysupgrade.itb --title "$V_UBI2" --notes-file fw-ubi2/release-notes.md
         # Remove older ubi2 releases, but never the one just created.
         gh release list --json tagName --jq '.[].tagName' | grep "^W1700K-Immortalwrt_" | grep -vxF "$V_UBI2" | xargs -r -n1 gh release delete --cleanup-tag -y ||:
