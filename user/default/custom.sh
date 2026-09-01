@@ -121,15 +121,18 @@ echo "mt76 package replaced with OpenW1700k version (7.1 kernel patch dropped fo
 
 # -------------------------------------------------
 # Wireless fixes (quilt-applied)
-# 610 US 6G 30dBm (self-maintained, applied after official 500/600) /
+# 610 US power boost (self-maintained, applied after official 500/600):
+#   5.5G 30dBm DFS / 5.8G 5730-5895@160 30dBm (UNII-4 merged) /
+#   6G 30dBm no NO-IR. Matches the w1700k-openwrt regdb outcome
+#   (CN 2.4G/5.2G + US 5.2G already covered by official 600 patch).
 # 999 iwinfo txpower list (from the fork at build time)
 # -------------------------------------------------
 mkdir -p package/firmware/wireless-regdb/patches
 mkdir -p package/network/utils/iwinfo/patches
 
-if [ -f "$DK_PROFILE/patches/610-w1700k-us-6g-30dbm.patch" ]; then
-    cp -f "$DK_PROFILE/patches/610-w1700k-us-6g-30dbm.patch" package/firmware/wireless-regdb/patches/
-    echo "regdb patch: 610-w1700k-us-6g-30dbm.patch"
+if [ -f "$DK_PROFILE/patches/610-w1700k-us-power-30.patch" ]; then
+    cp -f "$DK_PROFILE/patches/610-w1700k-us-power-30.patch" package/firmware/wireless-regdb/patches/
+    echo "regdb patch: 610-w1700k-us-power-30.patch"
 fi
 
 if [ -f "$FORK/package/network/utils/iwinfo/patches/999-fix-txpower-list.patch" ]; then
