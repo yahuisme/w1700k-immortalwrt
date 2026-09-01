@@ -77,7 +77,17 @@ jobs:
           cp -r $bp/files/ .
           rm -f files/build_info  # clear build_info pre-seeded in the base-builder image
           bash $DK_PROFILE/custom.sh
-          make defconfig; echo "CONFIG_VERSION_NUMBER=${{ matrix.target }}" >> .config
+          make defconfig
+          # OC profile bumps the embedded version code by 1 so the LuCI
+          # overview and the release tag both read rNNNNN+1 (profiles.json
+          # version_code is derived from VERSION_CODE below).
+          if [ "${{ matrix.target }}" = "ubi2-oc" ]; then
+            REV=$(./scripts/getver.sh)
+            VCODE=$(echo "$REV" | sed -E 's/^r([0-9]+).*/\1/')
+            VHASH=$(echo "$REV" | sed -E 's/^r[0-9]+[-+]?//')
+            echo "CONFIG_VERSION_CODE=r$((VCODE + 1))-$VHASH" >> .config
+          fi
+          echo "CONFIG_VERSION_NUMBER=${{ matrix.target }}" >> .config
           make download -j8 2>&1 | tee /dev/stderr | grep -q "ERROR:" || [ $PIPESTATUS -ne 0 ] && exit 1 ||:
         '
 
