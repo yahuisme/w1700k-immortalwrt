@@ -117,6 +117,11 @@ cp -r "$FORK/package/kernel/mt76" package/kernel/mt76
 # 6.18 mac80211 backport with the legacy layout, so that patch must not
 # be applied here or mt76 fails to build (addba_req/action_code undeclared).
 rm -f package/kernel/mt76/patches/100-mac80211-support-kernel-version-7.1.patch
+# OpenW1700k builds the Airoha ethernet driver as a module, so its
+# mt76-core DEPENDS on that fork-only kmod-airoha-eth package.
+# ImmortalWrt builds the driver into the kernel (CONFIG_NET_AIROHA=y)
+# and has no such package; drop the dependency or package/install fails.
+sed -i '/kmod-airoha-eth/d' package/kernel/mt76/Makefile
 echo "mt76 package replaced with OpenW1700k version (7.1 kernel patch dropped for 6.18 backport)"
 
 # -------------------------------------------------
