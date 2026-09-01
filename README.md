@@ -62,5 +62,8 @@ GitHub Actions 每日 **香港时间 17:00** 自动构建：
 
 ```text
 W1700K-Immortalwrt_<构建时间>_r<版本号>
-W1700K-OC-Immortalwrt_<构建时间>_r<版本号>
+W1700K-Immortalwrt-OC_<构建时间>_r<版本号+1>
 ```
+
+> OC 版的版本号在 ImmortalWrt 上游版本号基础上 +1（如常规版 `r40939`，OC 版 `r40940`），
+> 便于区分两个固件变体。

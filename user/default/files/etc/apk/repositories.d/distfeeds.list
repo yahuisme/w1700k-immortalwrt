@@ -7,5 +7,5 @@ https://downloads.immortalwrt.org/snapshots/packages/aarch64_cortex-a53/packages
 https://downloads.immortalwrt.org/snapshots/packages/aarch64_cortex-a53/routing/packages.adb
 https://downloads.immortalwrt.org/snapshots/packages/aarch64_cortex-a53/telephony/packages.adb
 # 官方 an7581 快照的 kmods 仓库按内核版本+vermagic 分目录（如 6.18.44-1-<hash>）。
-# 官方快照与本固件同为 6.18.44 内核，但构建配置不同致 vermagic 不一致（官方 7c08b90b… vs 自建 1a247be3…），
-# apk 会因版本不匹配拒绝安装，故不加入。
+# 官方快照与本固件同为 6.18.44 内核，但构建配置不同致 vermagic 不一致
+# （官方 vs 自建 hash 不同，随构建配置变化），apk 会因版本不匹配拒绝安装，故不加入。
