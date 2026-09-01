@@ -94,6 +94,16 @@ jobs:
 
     - name: Create release
       run: |
+        # Release list orders by publish time (newest first). Keep the
+        # standard build on top and the OC build below: ubi2 waits for the
+        # ubi2-oc job to finish and publish before creating its own release.
+        if [ "${{ matrix.target }}" = "ubi2" ]; then
+          for i in $(seq 1 120); do
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/jobs" \
+              --jq '[.jobs[] | select(.name == "Build ubi2-oc" and .status == "completed")] | length' | grep -q '^1$' && break
+            sleep 5
+          done
+        fi
         sudo chown -R "$(id -u):$(id -g)" openwrt_bin stcache
         find -L openwrt_bin/targets/*/* -maxdepth 1 \( -name '*sysupgrade.itb' -o -name 'profiles.json' \) -exec install -D -t firmware {} +
         PREFIX="W1700K-Immortalwrt_"
