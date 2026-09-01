@@ -110,7 +110,14 @@ done
 # version-mismatch class of patch issues entirely.
 rm -rf package/kernel/mt76
 cp -r "$FORK/package/kernel/mt76" package/kernel/mt76
-echo "mt76 package replaced with OpenW1700k version"
+# OpenW1700k maintains mt76 against the openwrt 7.1 kernel, whose
+# 100-mac80211-support-kernel-version-7.1.patch depends on the new
+# ieee80211_mgmt layout (u.action.action_code, function-style
+# IEEE80211_MIN_ACTION_SIZE(...)). ImmortalWrt master is still on the
+# 6.18 mac80211 backport with the legacy layout, so that patch must not
+# be applied here or mt76 fails to build (addba_req/action_code undeclared).
+rm -f package/kernel/mt76/patches/100-mac80211-support-kernel-version-7.1.patch
+echo "mt76 package replaced with OpenW1700k version (7.1 kernel patch dropped for 6.18 backport)"
 
 # -------------------------------------------------
 # Wireless fixes (quilt-applied)
