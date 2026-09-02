@@ -82,8 +82,8 @@ jobs:
           # version_code is derived from VERSION_CODE below).
           if [ "${{ matrix.target }}" = "ubi2-oc" ]; then
             REV=$(./scripts/getver.sh)
-            VCODE=$(echo "$REV" | sed -E 's/^r([0-9]+).*/\1/')
-            VHASH=$(echo "$REV" | sed -E 's/^r[0-9]+[-+]?//')
+            VCODE=$(echo "$REV" | sed -E "s/^r([0-9]+).*/\1/")
+            VHASH=$(echo "$REV" | sed -E "s/^r[0-9]+[-+]?//")
             echo "CONFIG_VERSION_CODE=r$((VCODE + 1))-$VHASH" >> .config
           fi
           echo "CONFIG_VERSION_NUMBER=${{ matrix.target }}" >> .config
