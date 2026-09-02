@@ -63,7 +63,14 @@ fi
 if grep -q 'spi-max-frequency = <50000000>' target/linux/airoha/dts/an7581.dtsi 2>/dev/null; then
     sed -i 's/spi-max-frequency = <50000000>/spi-max-frequency = <33000000>/' \
         target/linux/airoha/dts/an7581.dtsi
-    echo "spi-nand clock lowered to 33MHz"
+    if grep -q 'spi-max-frequency = <33000000>' target/linux/airoha/dts/an7581.dtsi; then
+        echo "spi-nand clock lowered to 33MHz"
+    else
+        echo "ERROR: spi-nand clock sed did not match; abort" >&2
+        exit 1
+    fi
+elif grep -q 'spi-max-frequency = <33000000>' target/linux/airoha/dts/an7581.dtsi 2>/dev/null; then
+    echo "spi-nand clock already 33MHz"
 else
     echo "WARN: spi-max-frequency not found in an7581.dtsi; skip"
 fi
@@ -318,7 +325,14 @@ if grep -q 'led-boot = &led_status_red;' "$DTS" 2>/dev/null; then
            -e 's/led-failsafe = &led_status_blue;/led-failsafe = \&led_status_red;/' \
            -e 's/led-running = &led_status_green;/led-running = \&led_status_white;/' \
         "$DTS"
-    echo "LED status colors set (boot=green, failsafe=red, running=white)"
+    if grep -q 'led-boot = &led_status_green;' "$DTS" \
+        && grep -q 'led-failsafe = &led_status_red;' "$DTS" \
+        && grep -q 'led-running = &led_status_white;' "$DTS"; then
+        echo "LED status colors set (boot=green, failsafe=red, running=white)"
+    else
+        echo "ERROR: LED colors sed did not match; abort" >&2
+        exit 1
+    fi
 else
     echo "WARN: LED aliases not found in an7581-w1700k-ubi.dts; skip"
 fi
@@ -339,7 +353,8 @@ elif grep -q '^[[:space:]]*cpufreq: cpufreq {' "$DTSI" 2>/dev/null; then
     if grep -q 'reg-names = "chip-scu", "mcucfg"' "$DTSI"; then
         echo "cpufreq node regs added (chip-scu/mcucfg)"
     else
-        echo "WARN: cpufreq regs injection failed; skip"
+        echo "ERROR: cpufreq regs injection failed; abort" >&2
+        exit 1
     fi
 else
     echo "WARN: cpufreq node not found in an7581.dtsi; skip"
