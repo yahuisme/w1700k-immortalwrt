@@ -66,10 +66,12 @@ jobs:
           git fetch && git checkout -f $REPO_BRANCH && git pull --rebase
           # Deterministic tree: the base-builder image ships a pre-seeded
           # build_dir whose stale prepared-kernel stamps can silently skip
-          # kernel prepares (poisoned toolchain dirs break oldconfig on
-          # injected drivers like rtl8261ce). Discard it every run.
+          # kernel prepares, so injected drivers (rtl8261ce) and dts changes
+          # never land in the kernel tree. Force a kernel re-prepare every
+          # run by removing only the kernel build dir; keep toolchain/host/
+          # package objects warm so ccache stays effective.
           git reset --hard origin/$REPO_BRANCH
-          git clean -fdx
+          rm -rf build_dir/target-*/linux-*
           mountpoint $DK_BIN || { echo "::error::not mounted" >&2; exit 1; }
           ln -sf $DK_BIN bin && ln -sf /dlcache dl && ln -sf /stcache staging_dir
           bp=$DK_PROFILE fc=feeds.conf
