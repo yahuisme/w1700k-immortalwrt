@@ -90,7 +90,7 @@ jobs:
           make download -j8 || exit 1
         '
 
-    - name: Compile OpenWrt
+    - name: Compile ImmortalWrt
       run: |
         for mode in c s; do
           docker_exec -e MODE=$mode DK bash -e -c '
