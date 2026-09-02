@@ -1,0 +1,14 @@
+--- a/target/linux/airoha/dts/an7581.dtsi
++++ b/target/linux/airoha/dts/an7581.dtsi
+@@ -31,3 +31,11 @@
+ 		};
+ 
++		/* 64 KiB reserved for ramoops/pstore */
++		ramoops@86ff0000 {
++			no-map;
++			compatible = "ramoops";
++			reg = <0x0 0x86ff0000 0x0 0x10000>;
++			record-size = <0x1000>;
++		};
++
+ 		qdma0_buf: qdma0-buf@87000000 {

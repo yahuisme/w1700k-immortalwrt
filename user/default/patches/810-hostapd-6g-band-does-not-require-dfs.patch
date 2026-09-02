@@ -1,0 +1,9 @@
+--- a/src/ap/dfs.c
++++ b/src/ap/dfs.c
+@@ -1599,5 +1599,6 @@ int hostapd_is_dfs_required(struct hostapd_iface *iface)
+ 	if ((!(iface->drv_flags & WPA_DRIVER_FLAGS_DFS_OFFLOAD) &&
+ 	     !iface->conf->ieee80211h) ||
+ 	    !iface->current_mode ||
++	    is_6ghz_freq(iface->freq) ||
+ 	    iface->current_mode->mode != HOSTAPD_MODE_IEEE80211A)
+ 		return 0;

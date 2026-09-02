@@ -98,21 +98,106 @@ for p in 745-net-pcs-airoha-extend-manual-rx-calib-to-E2-silicon.patch \
 done
 
 # -------------------------------------------------
-# mt76: ImmortalWrt official package + ported fork patches
+# mt76: ImmortalWrt official package + mirrored fork patches
 # -------------------------------------------------
-# Keep ImmortalWrt's official mt76 (openwrt/mt76 @ 59676919, the same
-# snapshot the fork used before its 2026-09-01 roll). The fork's new
-# snapshot (01367e60) requires kernel 7.x mac80211 API and does not
-# build on the 6.18 backport, so port the useful fork patches on top
-# of the official package instead. They apply after the official 100
-# patch; a failed apply aborts the build (fail-closed).
+# Keep ImmortalWrt's official mt76 (openwrt/mt76 @ 59676919). The fork's
+# snapshot (01367e60) requires kernel 7.x mac80211 API and does not build
+# on the 6.18 backport, so mirror the fork's own mt76 patches on top of
+# the official package instead. They apply after the official 100 patch;
+# a failed apply aborts the build (fail-closed).
 mkdir -p package/kernel/mt76/patches
-cp -f $DK_PROFILE/patches/910-mt7996-enable-firmware-txpower-limit.patch \
-      $DK_PROFILE/patches/911-mt7996-refresh-power-limits-on-txpower-changes.patch \
-      $DK_PROFILE/patches/912-mt7996-guard-txfree-overrun.patch \
-      $DK_PROFILE/patches/913-mt7996-replace-wtbl-access-with-mcu-for-station-stats.patch \
-    package/kernel/mt76/patches/
-echo "mt76: official package + 4 ported fork patches"
+mt76_patches=("$DK_PROFILE"/patches/9??-mt76-*.patch)
+if [ "${mt76_patches[0]}" = "$DK_PROFILE/patches/9??-mt76-*.patch" ]; then
+    echo "ERROR: no mt76 patches found in $DK_PROFILE/patches (9??-mt76-*.patch)"
+    exit 1
+fi
+for p in "${mt76_patches[@]}"; do
+    cp -f "$p" package/kernel/mt76/patches/
+done
+echo "mt76: official package + ${#mt76_patches[@]} mirrored fork patches"
+
+# -------------------------------------------------
+# wifi-scripts: per-interface txpower (fork pr-23990 mirror)
+# -------------------------------------------------
+# The fork carries pr-23990 (per-VIF txpower with verify+retry) on top
+# of openwrt wifi-scripts; mirror it onto ImmortalWrt's ucode script.
+WS_PATCH="$DK_PROFILE/patches/910-wifi-scripts-set-txpower-per-interface.patch"
+if [ -f "$WS_PATCH" ]; then
+    patch -d package/network/config/wifi-scripts -p1 < "$WS_PATCH"
+    echo "wifi-scripts: per-interface txpower patch applied"
+else
+    echo "ERROR: wifi-scripts txpower patch missing"
+    exit 1
+fi
+
+# -------------------------------------------------
+# hostapd: 6G band does not require DFS (fork mtk-0015 mirror)
+# -------------------------------------------------
+cp -f "$DK_PROFILE/patches/810-hostapd-6g-band-does-not-require-dfs.patch" \
+    package/network/services/hostapd/patches/
+echo "hostapd: 6G-no-DFS patch installed"
+
+# -------------------------------------------------
+# dropbear: quiet per-connection session logs (fork mirror)
+# -------------------------------------------------
+cp -f "$DK_PROFILE/patches/500-quiet-session-logs.patch" \
+    package/network/services/dropbear/patches/
+echo "dropbear: quiet session logs patch installed"
+
+# -------------------------------------------------
+# Kernel: bridge flow offload + rtl8261ce PHY (fork mirror)
+# -------------------------------------------------
+cp -f "$DK_PROFILE"/patches/675-0[123]-*.patch target/linux/generic/pending-6.18/
+cp -f "$DK_PROFILE/patches/999-net-phy-realtek-rtl8261ce.patch" \
+    target/linux/generic/hack-6.18/
+echo "kernel: bridge flow offload + rtl8261ce PHY patches installed"
+
+# -------------------------------------------------
+# ramoops/pstore: crash log region (fork mirror)
+# -------------------------------------------------
+patch -p1 --ignore-whitespace < "$DK_PROFILE/patches/910-airoha-ramoops.patch"
+for cfg in CONFIG_PSTORE=y CONFIG_PSTORE_COMPRESS=y CONFIG_PSTORE_CONSOLE=y \
+           CONFIG_PSTORE_PMSG=y CONFIG_PSTORE_RAM=y; do
+    grep -qxF "$cfg" target/linux/airoha/an7581/config-6.18 \
+        || echo "$cfg" >> target/linux/airoha/an7581/config-6.18
+done
+echo "ramoops: dts node + PSTORE config enabled"
+
+# -------------------------------------------------
+# Default packages: eip93 crypto + bridge-flow-offload (fork target.mk mirror)
+# -------------------------------------------------
+TMK=target/linux/airoha/an7581/target.mk
+if grep -q 'kmod-crypto-hw-eip93' "$TMK"; then
+    echo "target.mk: eip93/flow-offload already present"
+else
+    sed -i 's#\tairoha-en7581-npu-firmware uboot-envtools#\tairoha-en7581-npu-firmware uboot-envtools kmod-crypto-hw-eip93 \\\n\tbridge-flow-offload#' "$TMK"
+    echo "target.mk: +kmod-crypto-hw-eip93 +bridge-flow-offload"
+fi
+
+# -------------------------------------------------
+# rtl8261ce kmod definition (fork netdevices.mk mirror)
+# -------------------------------------------------
+NDM=package/kernel/linux/modules/netdevices.mk
+if ! grep -q 'phy-rtl8261ce' "$NDM"; then
+    cat >> "$NDM" <<'EOF'
+
+define KernelPackage/phy-rtl8261ce
+   SUBMENU:=$(NETWORK_DEVICES_MENU)
+   TITLE:=Realtek RTL8261CE 10GBASE-T PHY driver
+   KCONFIG:=CONFIG_RTL8261CE_PHY
+   DEPENDS:=+kmod-libphy +kmod-hwmon-core
+   FILES:=$(LINUX_DIR)/drivers/net/phy/rtl8261ce/rtk-rtl8261ce-phy.ko
+   AUTOLOAD:=$(call AutoLoad,18,rtk-rtl8261ce-phy,1)
+endef
+
+define KernelPackage/phy-rtl8261ce/description
+   Supports the Realtek RTL8261CE 10GBASE-T PHY.
+endef
+
+$(eval $(call KernelPackage,phy-rtl8261ce))
+EOF
+    echo "netdevices.mk: phy-rtl8261ce kmod added"
+fi
 
 # -------------------------------------------------
 # Wireless fixes (quilt-applied)
