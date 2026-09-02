@@ -123,7 +123,7 @@ echo "mt76: official package + ${#mt76_patches[@]} mirrored fork patches"
 # of openwrt wifi-scripts; mirror it onto ImmortalWrt's ucode script.
 WS_PATCH="$DK_PROFILE/patches/910-wifi-scripts-set-txpower-per-interface.patch"
 if [ -f "$WS_PATCH" ]; then
-    patch -d package/network/config/wifi-scripts -p1 < "$WS_PATCH"
+    patch -p1 --ignore-whitespace < "$WS_PATCH"
     echo "wifi-scripts: per-interface txpower patch applied"
 else
     echo "ERROR: wifi-scripts txpower patch missing"
