@@ -171,7 +171,12 @@ if grep -q 'kmod-crypto-hw-eip93' "$TMK"; then
     echo "target.mk: eip93/flow-offload already present"
 else
     sed -i 's#\tairoha-en7581-npu-firmware uboot-envtools#\tairoha-en7581-npu-firmware uboot-envtools kmod-crypto-hw-eip93 \\\n\tbridge-flow-offload#' "$TMK"
-    echo "target.mk: +kmod-crypto-hw-eip93 +bridge-flow-offload"
+    if grep -q 'kmod-crypto-hw-eip93' "$TMK" && grep -q 'bridge-flow-offload' "$TMK"; then
+        echo "target.mk: +kmod-crypto-hw-eip93 +bridge-flow-offload"
+    else
+        echo "ERROR: target.mk sed did not match; abort"
+        exit 1
+    fi
 fi
 
 # -------------------------------------------------
