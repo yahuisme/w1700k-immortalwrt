@@ -10,11 +10,12 @@ echo "Running custom commands"
 # -------------------------------------------------
 # luci-app-wifi7 / luci-app-mlo / luci-app-airoha-npu /
 # luci-app-airoha-flowsense / luci-app-w1700k-fancontrol
-# are not available in ImmortalWrt feeds. Platform / mt76 / iwinfo
-# patches are also taken from the fork at build time so they always
-# track upstream latest (same model as the w1700k-openwrt builds that
-# use the fork tree directly). Follow the OpenW1700k ubi2 branch at
-# build time (no version pinning).
+# are not available in ImmortalWrt feeds. Platform / iwinfo patches are
+# also taken from the fork at build time so they always track upstream
+# latest (same model as the w1700k-openwrt builds that use the fork
+# tree directly). Follow the OpenW1700k ubi2 branch at build time
+# (no version pinning). mt76 stays on the ImmortalWrt official package
+# with ported fork patches (see below).
 FORK=/tmp/openw1700k
 if ! git clone --depth=1 --filter=blob:none --sparse --branch ubi2 \
     https://github.com/OpenWRT-fanboy/OpenW1700k.git "$FORK"; then
@@ -24,7 +25,7 @@ fi
 git -C "$FORK" sparse-checkout set \
     package/luci-app-wifi7 package/luci-app-mlo package/luci-app-airoha-npu \
     package/luci-app-airoha-flowsense package/luci-app-w1700k-fancontrol \
-    target/linux/airoha/patches-6.18 package/kernel/mt76 \
+    target/linux/airoha/patches-6.18 \
     package/network/utils/iwinfo/patches
 cp -r "$FORK/package/luci-app-wifi7" "$FORK/package/luci-app-mlo" \
       "$FORK/package/luci-app-airoha-npu" "$FORK/package/luci-app-airoha-flowsense" \
@@ -97,28 +98,21 @@ for p in 745-net-pcs-airoha-extend-manual-rx-calib-to-E2-silicon.patch \
 done
 
 # -------------------------------------------------
-# mt76 package from OpenW1700k (version + patches)
+# mt76: ImmortalWrt official package + ported fork patches
 # -------------------------------------------------
-# Use the fork's mt76 package wholesale (pinned mt76-firmware snapshot
-# plus its in-tree patches) instead of ImmortalWrt's older snapshot with
-# individually ported patches. This is the same tested combo as the
-# w1700k-openwrt builds on kernel 6.18.44, and it removes the
-# version-mismatch class of patch issues entirely.
-rm -rf package/kernel/mt76
-cp -r "$FORK/package/kernel/mt76" package/kernel/mt76
-# OpenW1700k maintains mt76 against the openwrt 7.1 kernel, whose
-# 100-mac80211-support-kernel-version-7.1.patch depends on the new
-# ieee80211_mgmt layout (u.action.action_code, function-style
-# IEEE80211_MIN_ACTION_SIZE(...)). ImmortalWrt master is still on the
-# 6.18 mac80211 backport with the legacy layout, so that patch must not
-# be applied here or mt76 fails to build (addba_req/action_code undeclared).
-rm -f package/kernel/mt76/patches/100-mac80211-support-kernel-version-7.1.patch
-# OpenW1700k builds the Airoha ethernet driver as a module, so its
-# mt76-core DEPENDS on that fork-only kmod-airoha-eth package.
-# ImmortalWrt builds the driver into the kernel (CONFIG_NET_AIROHA=y)
-# and has no such package; drop the dependency or package/install fails.
-sed -i '/kmod-airoha-eth/d' package/kernel/mt76/Makefile
-echo "mt76 package replaced with OpenW1700k version (7.1 kernel patch dropped for 6.18 backport)"
+# Keep ImmortalWrt's official mt76 (openwrt/mt76 @ 59676919, the same
+# snapshot the fork used before its 2026-09-01 roll). The fork's new
+# snapshot (01367e60) requires kernel 7.x mac80211 API and does not
+# build on the 6.18 backport, so port the useful fork patches on top
+# of the official package instead. They apply after the official 100
+# patch; a failed apply aborts the build (fail-closed).
+mkdir -p package/kernel/mt76/patches
+cp -f $DK_PROFILE/patches/910-mt7996-enable-firmware-txpower-limit.patch \
+      $DK_PROFILE/patches/911-mt7996-refresh-power-limits-on-txpower-changes.patch \
+      $DK_PROFILE/patches/912-mt7996-guard-txfree-overrun.patch \
+      $DK_PROFILE/patches/913-mt7996-replace-wtbl-access-with-mcu-for-station-stats.patch \
+    package/kernel/mt76/patches/
+echo "mt76: official package + 4 ported fork patches"
 
 # -------------------------------------------------
 # Wireless fixes (quilt-applied)
