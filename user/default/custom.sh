@@ -152,6 +152,16 @@ cp -f "$DK_PROFILE/patches/999-net-phy-realtek-rtl8261ce.patch" \
     target/linux/generic/hack-6.18/
 echo "kernel: bridge flow offload + rtl8261ce PHY patches installed"
 
+# rtl8261ce driver files must be injected via target/linux/generic/files:
+# the toolchain kernel-headers stage runs oldconfig over every Kconfig
+# source line, so a missing driver dir fails the build cryptically.
+# Fail fast instead if the profile files did not land in the tree.
+if [ ! -f target/linux/generic/files/drivers/net/phy/rtl8261ce/Kconfig ]; then
+    echo "ERROR: rtl8261ce driver files missing from target/linux/generic/files; abort" >&2
+    exit 1
+fi
+echo "rtl8261ce: driver files verified in target/linux/generic/files"
+
 # -------------------------------------------------
 # ramoops/pstore: crash log region (fork mirror)
 # -------------------------------------------------
@@ -202,6 +212,25 @@ endef
 $(eval $(call KernelPackage,phy-rtl8261ce))
 EOF
     echo "netdevices.mk: phy-rtl8261ce kmod added"
+fi
+
+# Enable the RTL8261CE PHY driver in the W1700K DEVICE_PACKAGES (fork
+# an7581.mk ships `rtl826x-firmware kmod-phy-rtl8261ce`; ImmortalWrt's
+# own an7581.mk stops at rtl826x-firmware). Without this the driver is
+# defined but never selected, and the firmware misses 10G PHY support.
+ANM=target/linux/airoha/image/an7581.mk
+if grep -q 'rtl826x-firmware kmod-phy-rtl8261ce' "$ANM"; then
+    echo "an7581.mk: kmod-phy-rtl8261ce already in W1700K DEVICE_PACKAGES"
+elif grep -q 'rtl826x-firmware' "$ANM"; then
+    sed -i 's/rtl826x-firmware$/rtl826x-firmware kmod-phy-rtl8261ce/' "$ANM"
+    if grep -q 'rtl826x-firmware kmod-phy-rtl8261ce' "$ANM"; then
+        echo "an7581.mk: +kmod-phy-rtl8261ce in W1700K DEVICE_PACKAGES"
+    else
+        echo "ERROR: an7581.mk sed did not match; abort" >&2
+        exit 1
+    fi
+else
+    echo "WARN: rtl826x-firmware not found in $ANM; skip"
 fi
 
 # -------------------------------------------------
