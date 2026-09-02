@@ -1,10 +1,10 @@
-# AI 协力构建的 Quantum Fiber W1700K ImmortalWrt 固件
+# AI 协力构建的 Quantum Fiber / Gemtek W1700K ImmortalWrt 固件
 
-适用于 **Quantum Fiber W1700K** 路由器的定制 ImmortalWrt 固件构建项目。
+适用于 **Quantum Fiber / Gemtek W1700K** 路由器的定制 ImmortalWrt 固件构建项目。
 
-基于 [w1700k/builds](https://github.com/w1700k/builds) 构建框架，源码基线为 [ImmortalWrt 官方 snapshot](https://github.com/immortalwrt/immortalwrt)，内置应用、配置与汉化与 [w1700k-openwrt](https://github.com/yahuisme/w1700k-openwrt) 保持一致（值守式系统升级界面除外）。
+基于 [w1700k/builds](https://github.com/w1700k/builds) 构建框架，源码基线为 [ImmortalWrt 官方 snapshot](https://github.com/immortalwrt/immortalwrt)，内置应用、配置与汉化与 [w1700k-openwrt](https://github.com/yahuisme/w1700k-openwrt) 保持一致。
 
-> ⚠️ **仅适用于 Quantum Fiber W1700K，请勿刷入其他型号设备。**
+> ⚠️ **仅适用于 Quantum Fiber / Gemtek W1700K，请勿刷入其他型号设备。**
 
 ---
 
