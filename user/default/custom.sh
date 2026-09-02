@@ -152,15 +152,39 @@ cp -f "$DK_PROFILE/patches/999-net-phy-realtek-rtl8261ce.patch" \
     target/linux/generic/hack-6.18/
 echo "kernel: bridge flow offload + rtl8261ce PHY patches installed"
 
-# rtl8261ce driver files must be injected via target/linux/generic/files:
-# the toolchain kernel-headers stage runs oldconfig over every Kconfig
-# source line, so a missing driver dir fails the build cryptically.
-# Fail fast instead if the profile files did not land in the tree.
+# rtl8261ce driver files + fork tree files cannot reach target/linux/...
+# or package/... via the rootfs files/ overlay, so copy them into the
+# buildroot tree explicitly (same paths as the OpenW1700k fork).
+TREE="$DK_PROFILE/tree"
+mkdir -p target/linux/generic/files/drivers/net/phy/rtl8261ce
+cp -f "$TREE"/target/linux/generic/files/drivers/net/phy/rtl8261ce/* \
+    target/linux/generic/files/drivers/net/phy/rtl8261ce/
 if [ ! -f target/linux/generic/files/drivers/net/phy/rtl8261ce/Kconfig ]; then
-    echo "ERROR: rtl8261ce driver files missing from target/linux/generic/files; abort" >&2
+    echo "ERROR: rtl8261ce driver files missing after injection; abort" >&2
     exit 1
 fi
-echo "rtl8261ce: driver files verified in target/linux/generic/files"
+echo "rtl8261ce: driver files injected into target/linux/generic/files"
+
+mkdir -p target/linux/airoha/base-files/etc
+cp -f "$TREE/target/linux/airoha/base-files/etc/tx-debug.sh" \
+    target/linux/airoha/base-files/etc/
+mkdir -p target/linux/airoha/an7581/base-files/etc/hotplug.d/iface
+cp -f "$TREE/target/linux/airoha/an7581/base-files/etc/hotplug.d/iface/51-bridge-flow-offload" \
+    target/linux/airoha/an7581/base-files/etc/hotplug.d/iface/
+mkdir -p package/network/config/bridge-flow-offload/files/usr/share/bridge-flow-offload
+cp -f "$TREE/package/network/config/bridge-flow-offload/Makefile" \
+    package/network/config/bridge-flow-offload/
+cp -f "$TREE/package/network/config/bridge-flow-offload/files/usr/share/bridge-flow-offload/apply-rules.sh" \
+    package/network/config/bridge-flow-offload/files/usr/share/bridge-flow-offload/
+# verify all tree injections landed (fail closed)
+for f in \
+    target/linux/generic/files/drivers/net/phy/rtl8261ce/Kconfig \
+    target/linux/airoha/base-files/etc/tx-debug.sh \
+    target/linux/airoha/an7581/base-files/etc/hotplug.d/iface/51-bridge-flow-offload \
+    package/network/config/bridge-flow-offload/Makefile; do
+    [ -f "$f" ] || { echo "ERROR: tree injection missing: $f; abort" >&2; exit 1; }
+done
+echo "tree: airoha base-files + bridge-flow-offload package injected"
 
 # -------------------------------------------------
 # ramoops/pstore: crash log region (fork mirror)
