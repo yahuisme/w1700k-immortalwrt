@@ -174,6 +174,20 @@ done
 echo "ramoops: dts node + PSTORE config enabled"
 
 # -------------------------------------------------
+# AN7581 audio: disable (no audio hardware on W1700K; fork mirror)
+# -------------------------------------------------
+if grep -q '^CONFIG_SND_SOC_AN7581=y$' target/linux/airoha/an7581/config-6.18; then
+    sed -i 's/^CONFIG_SND_SOC_AN7581=y$/# CONFIG_SND_SOC_AN7581 is not set/' \
+        target/linux/airoha/an7581/config-6.18
+    grep -q '^# CONFIG_SND_SOC_AN7581 is not set$' \
+        target/linux/airoha/an7581/config-6.18 \
+        && echo "AN7581 audio: disabled (fork mirror)" \
+        || { echo "ERROR: AN7581 audio disable failed"; exit 1; }
+else
+    echo "AN7581 audio: already disabled or absent"
+fi
+
+# -------------------------------------------------
 # Default packages: eip93 crypto + bridge-flow-offload (fork target.mk mirror)
 # -------------------------------------------------
 TMK=target/linux/airoha/an7581/target.mk
