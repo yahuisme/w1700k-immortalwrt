@@ -1,6 +1,6 @@
 --- a/target/linux/airoha/dts/an7581.dtsi
 +++ b/target/linux/airoha/dts/an7581.dtsi
-@@ -148,78 +148,78 @@
+@@ -156,78 +156,78 @@
  		compatible = "operating-points-v2";
  		opp-shared;
  

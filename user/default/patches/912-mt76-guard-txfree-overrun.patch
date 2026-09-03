@@ -1,7 +1,6 @@
 --- a/mt7996/mac.c
 +++ b/mt7996/mac.c
-@@ -1382,9 +1382,9 @@ mt7996_mac_tx_free(struct mt7996_dev *dev, void *data, int len)
- 	for (cur_info = &tx_free[2]; count < total; cur_info++) {
+@@ -1317,8 +1317,8 @@
  		u32 msdu, info;
  		u8 i;
  
