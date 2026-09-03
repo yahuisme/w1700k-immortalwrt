@@ -388,13 +388,6 @@ else
     echo "WARN: cpufreq node not found in an7581.dtsi; skip"
 fi
 
-# ImmortalWrt's luci-app-irqbalance was rewritten upstream: its view no
-# longer contains the raw row.tail string, and the feed already ships a
-# complete zh_Hans translation for the new UI. The legacy i18n patch and
-# PO from the OpenWrt project are obsolete here and are intentionally
-# skipped to avoid breaking the build or regressing translations.
-
-
 # -------------------------------------------------
 # Install latest Aurora LuCI theme
 # -------------------------------------------------
@@ -542,8 +535,20 @@ else
     echo "WARN: ttyd menu file not found; skip"
 fi
 
-# The feed's zh_Hans PO leaves the menu title "irqbalance" untranslated.
-# Fix the msgstr in place so the Services menu shows the localized name.
+# luci-app-irqbalance ships its own zh_Hans translation in the
+# feed. The feed PO leaves the menu title "irqbalance" untranslated and the
+# view leaves raw /proc/interrupts IPI names unlocalized. Localize the menu
+# in place and patch the view so interrupt names are passed through _().
+IRQ_JS="feeds/luci/applications/luci-app-irqbalance/htdocs/luci-static/resources/view/irqbalance.js"
+if [ -f "$IRQ_JS" ]; then
+    sed -i "s#row\.tail || '\''-'\''#row.tail ? _(row.tail) : '\''-'\''#" "$IRQ_JS"
+    if grep -q "row.tail ? _(row.tail) : '-'" "$IRQ_JS"; then
+        echo "irqbalance.js localized (/proc/interrupts names)"
+    else
+        echo "WARN: irqbalance.js sed did not match; skip"
+    fi
+fi
+
 IRQ_PO="feeds/luci/applications/luci-app-irqbalance/po/zh_Hans/irqbalance.po"
 if [ -f "$IRQ_PO" ]; then
     sed -i '/^msgid "irqbalance"$/{n;s/^msgstr "irqbalance"$/msgstr "IRQ 平衡"/}' "$IRQ_PO"
@@ -552,6 +557,33 @@ if [ -f "$IRQ_PO" ]; then
     else
         echo "WARN: irqbalance zh_Hans msgid not found; skip"
     fi
+    cat >> "$IRQ_PO" << 'EOF'
+
+msgid "Rescheduling interrupts"
+msgstr "重新调度中断"
+
+msgid "Function call interrupts"
+msgstr "函数调用中断"
+
+msgid "CPU stop interrupts"
+msgstr "CPU 停止中断"
+
+msgid "CPU stop NMIs"
+msgstr "CPU 停止 NMI"
+
+msgid "Timer broadcast interrupts"
+msgstr "定时器广播中断"
+
+msgid "IRQ work interrupts"
+msgstr "IRQ 工作中断"
+
+msgid "CPU backtrace interrupts"
+msgstr "CPU 回溯中断"
+
+msgid "KGDB roundup interrupts"
+msgstr "KGDB 汇总中断"
+EOF
+    echo "irqbalance IPI interrupt names added to PO"
 else
     echo "WARN: irqbalance zh_Hans PO not found; skip"
 fi
