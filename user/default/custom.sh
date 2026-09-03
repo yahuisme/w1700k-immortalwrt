@@ -41,21 +41,45 @@ mkdir -p feeds/luci/modules/luci-mod-status/patches
 cp -f $DK_PROFILE/patches/998-single-wiphy.patch \
     feeds/luci/modules/luci-mod-status/patches/998-single-wiphy.patch
 
-if [ -d package/luci-app-wifi7 ] && [ -f $DK_PROFILE/patches/998-wifi7-i18n.patch ]; then
-    patch -d package/luci-app-wifi7 -p1 --ignore-whitespace < $DK_PROFILE/patches/998-wifi7-i18n.patch
+if [ ! -d package/luci-app-wifi7 ]; then
+    echo "ERROR: luci-app-wifi7 missing after fork clone" >&2
+    exit 1
 fi
+if [ ! -f $DK_PROFILE/patches/998-wifi7-i18n.patch ]; then
+    echo "ERROR: 998-wifi7-i18n.patch missing" >&2
+    exit 1
+fi
+patch -d package/luci-app-wifi7 -p1 --ignore-whitespace < $DK_PROFILE/patches/998-wifi7-i18n.patch
 
-if [ -d package/luci-app-w1700k-fancontrol ] && [ -f $DK_PROFILE/patches/998-fancontrol-i18n.patch ]; then
-    patch -d package/luci-app-w1700k-fancontrol -p1 --ignore-whitespace < $DK_PROFILE/patches/998-fancontrol-i18n.patch
+if [ ! -d package/luci-app-w1700k-fancontrol ]; then
+    echo "ERROR: luci-app-w1700k-fancontrol missing after fork clone" >&2
+    exit 1
 fi
+if [ ! -f $DK_PROFILE/patches/998-fancontrol-i18n.patch ]; then
+    echo "ERROR: 998-fancontrol-i18n.patch missing" >&2
+    exit 1
+fi
+patch -d package/luci-app-w1700k-fancontrol -p1 --ignore-whitespace < $DK_PROFILE/patches/998-fancontrol-i18n.patch
 
-if [ -d package/luci-app-airoha-npu ] && [ -f $DK_PROFILE/patches/998-npu-i18n.patch ]; then
-    patch -d package/luci-app-airoha-npu -p1 --ignore-whitespace < $DK_PROFILE/patches/998-npu-i18n.patch
+if [ ! -d package/luci-app-airoha-npu ]; then
+    echo "ERROR: luci-app-airoha-npu missing after fork clone" >&2
+    exit 1
 fi
+if [ ! -f $DK_PROFILE/patches/998-npu-i18n.patch ]; then
+    echo "ERROR: 998-npu-i18n.patch missing" >&2
+    exit 1
+fi
+patch -d package/luci-app-airoha-npu -p1 --ignore-whitespace < $DK_PROFILE/patches/998-npu-i18n.patch
 
-if [ -d package/luci-app-airoha-flowsense ] && [ -f $DK_PROFILE/patches/998-flowsense-i18n.patch ]; then
-    patch -d package/luci-app-airoha-flowsense -p1 --ignore-whitespace < $DK_PROFILE/patches/998-flowsense-i18n.patch
+if [ ! -d package/luci-app-airoha-flowsense ]; then
+    echo "ERROR: luci-app-airoha-flowsense missing after fork clone" >&2
+    exit 1
 fi
+if [ ! -f $DK_PROFILE/patches/998-flowsense-i18n.patch ]; then
+    echo "ERROR: 998-flowsense-i18n.patch missing" >&2
+    exit 1
+fi
+patch -d package/luci-app-airoha-flowsense -p1 --ignore-whitespace < $DK_PROFILE/patches/998-flowsense-i18n.patch
 
 # -------------------------------------------------
 # SPI-NAND stability: 50MHz -> 33MHz (OpenW1700k fix)
@@ -292,6 +316,9 @@ mkdir -p package/network/utils/iwinfo/patches
 if [ -f "$DK_PROFILE/patches/610-w1700k-us-power-30.patch" ]; then
     cp -f "$DK_PROFILE/patches/610-w1700k-us-power-30.patch" package/firmware/wireless-regdb/patches/
     echo "regdb patch: 610-w1700k-us-power-30.patch"
+else
+    echo "ERROR: regdb patch missing: 610-w1700k-us-power-30.patch" >&2
+    exit 1
 fi
 
 if [ -f "$FORK/package/network/utils/iwinfo/patches/999-fix-txpower-list.patch" ]; then
@@ -312,7 +339,8 @@ if grep -q '^CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y' .config 2>/dev/null; the
             < "$DK_PROFILE/patches/001-oc-cpu-opp-1400mhz.patch"
         echo "OC OPP patch applied (1.4GHz)"
     else
-        echo "WARN: OC profile but OPP patch missing; skip"
+        echo "ERROR: OC profile but OPP patch missing; abort" >&2
+        exit 1
     fi
 fi
 
