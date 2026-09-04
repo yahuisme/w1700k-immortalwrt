@@ -65,13 +65,10 @@ jobs:
           git remote set-url origin $REPO_URL 2>&- || git remote add origin $REPO_URL
           git fetch && git checkout -f $REPO_BRANCH
           git reset --hard origin/$REPO_BRANCH
-          # Deterministic tree: the base-builder image ships a pre-seeded
-          # build_dir whose stale prepared-kernel stamps can silently skip
-          # kernel prepares, so injected drivers (rtl8261ce) and dts changes
-          # never land in the kernel tree. Force a kernel re-prepare every
-          # run by removing only the kernel build dir; keep toolchain/host/
-          # package objects warm so ccache stays effective.
-          rm -rf build_dir/target-*/linux-*
+          # Deterministic tree: force kernel re-prepare so injected drivers
+          # (rtl8261ce) and dts changes are always patched, while keeping
+          # compiled objects intact so incremental compilation stays fast.
+          rm -f build_dir/target-*/linux-*/.prepared* build_dir/target-*/linux-*/.config*
           mountpoint $DK_BIN || { echo "::error::not mounted" >&2; exit 1; }
           ln -sf $DK_BIN bin && ln -sf /dlcache dl && ln -sf /stcache staging_dir
           bp=$DK_PROFILE fc=feeds.conf
