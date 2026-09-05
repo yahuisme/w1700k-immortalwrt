@@ -457,29 +457,10 @@ fi
 
 echo "Installing Chinese translations for Airoha LuCI apps..."
 
-translation_targets=(
-    "luci-app-airoha-flowsense|package/luci-app-airoha-flowsense"
-    "luci-app-airoha-npu|package/luci-app-airoha-npu"
-    "luci-app-w1700k-fancontrol|package/luci-app-w1700k-fancontrol"
-    "luci-app-wifi7|package/luci-app-wifi7"
-)
-
-for translation_target in "${translation_targets[@]}"; do
-    package_name="${translation_target%%|*}"
-    target="${translation_target#*|}"
-    translation="$DK_PROFILE/po/zh_Hans/${package_name}.po"
-
-    if [ ! -d "$target" ]; then
-        echo "ERROR: Translation target package is missing: $target"
-        exit 1
-    fi
-    if [ ! -f "$translation" ]; then
-        echo "ERROR: Translation file is missing: $translation"
-        exit 1
-    fi
-
-    mkdir -p "$target/po/zh_Hans"
-    cp -f "$translation" "$target/po/zh_Hans/${package_name}.po"
+for app in luci-app-airoha-flowsense luci-app-airoha-npu luci-app-w1700k-fancontrol luci-app-wifi7; do
+    [ -d "package/$app" ] || { echo "ERROR: package/$app missing" >&2; exit 1; }
+    mkdir -p "package/$app/po/zh_Hans"
+    cp -f "$DK_PROFILE/po/zh_Hans/$app.po" "package/$app/po/zh_Hans/$app.po"
 done
 
 # The temperature & fan overview widget ships as 15_temperature.js inside
@@ -496,10 +477,9 @@ if [ -f package/luci-app-airoha-npu/root/usr/share/luci/menu.d/luci-app-airoha-n
     sed -i 's/"title": "SoC Status"/"title": "Airoha SoC 状态"/' \
         package/luci-app-airoha-npu/root/usr/share/luci/menu.d/luci-app-airoha-npu.json
 fi
-if [ -d package/luci-app-airoha-flowsense ]; then
-    find package/luci-app-airoha-flowsense -type f \( -name '*.json' -o -name '*.js' \) -exec \
-        sed -i -e 's/"title": "FlowSense"/"title": "Airoha 流量感知"/g' \
-               -e 's/"title": "Airoha FlowSense"/"title": "Airoha 流量感知"/g' {} +
+FSMENU="package/luci-app-airoha-flowsense/root/usr/share/luci/menu.d/luci-app-airoha-flowsense.json"
+if [ -f "$FSMENU" ]; then
+    sed -i -e 's/"title": "FlowSense"/"title": "Airoha 流量感知"/g'            -e 's/"title": "Airoha FlowSense"/"title": "Airoha 流量感知"/g' "$FSMENU"
 fi
 
 # Move Airoha Fan Control from the System menu into the Status menu, between
@@ -540,27 +520,6 @@ rm -rf tmp/info 2>/dev/null || true
 rm -f tmp/.packageinfo 2>/dev/null || true
 
 
-# -------------------------------------------------
-# Enable Chinese language
-# -------------------------------------------------
-
-echo "Enabling Chinese language..."
-
-grep -qxF 'CONFIG_LUCI_LANG_zh_Hans=y' .config || \
-    echo 'CONFIG_LUCI_LANG_zh_Hans=y' >> .config
-
-
-# -------------------------------------------------
-# Enable Aurora
-# -------------------------------------------------
-
-echo "Enabling Aurora theme..."
-
-grep -qxF 'CONFIG_PACKAGE_luci-theme-aurora=y' .config || \
-    echo 'CONFIG_PACKAGE_luci-theme-aurora=y' >> .config
-
-grep -qxF 'CONFIG_PACKAGE_luci-app-aurora-config=y' .config || \
-    echo 'CONFIG_PACKAGE_luci-app-aurora-config=y' >> .config
 
 
 echo "=============================================="
