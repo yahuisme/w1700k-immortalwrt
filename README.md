@@ -61,8 +61,8 @@ LuCI 状态首页显示 CPU、主板、10G WAN/LAN PHY、2.4/5/6 GHz WiFi 温度
 GitHub Actions 每日 **香港时间 14:00** 自动构建：
 
 ```text
-W1700K-Immortalwrt_<构建时间>_r<版本号>
-W1700K-Immortalwrt-OC_<构建时间>_r<版本号+1>
+W1700K-ImmortalWrt_<构建时间>_r<版本号>
+W1700K-ImmortalWrt-OC_<构建时间>_r<版本号+1>
 ```
 
 > OC 版的版本号在 ImmortalWrt 上游版本号基础上 +1（如常规版 `r40939`，OC 版 `r40940`），
