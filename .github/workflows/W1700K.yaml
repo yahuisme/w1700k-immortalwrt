@@ -40,8 +40,9 @@ jobs:
 
     - name: Initialize environment
       run: |
-        [ -f "user/${{ matrix.target }}/config.diff" ] || { echo "::error::config.diff not found for ${{ matrix.target }}"; exit 1; }
-        rsync -aI --mkpath user/default/ user/${{ matrix.target }}/ user/current/ 2>&-
+        [ -f "user/${{ matrix.target }}/config.diff" ] || [ -f "user/default/config.diff" ] || { echo "::error::config.diff not found"; exit 1; }
+        rsync -aI --mkpath user/default/ user/current/ 2>&-
+        rsync -aI --mkpath user/${{ matrix.target }}/ user/current/ 2>&-
         echo 'CONFIG_CCACHE_DIR="/ghcache"' >> user/current/config.diff
         sudo tee /etc/docker/daemon.json <<< '{"max-concurrent-downloads":50,"max-concurrent-uploads":50,"experimental":true}'
         sudo systemctl reload docker
@@ -71,14 +72,12 @@ jobs:
           rm -f build_dir/target-*/linux-*/.prepared* build_dir/target-*/linux-*/.config*
           mountpoint $DK_BIN || { echo "::error::not mounted" >&2; exit 1; }
           ln -sf $DK_BIN bin && ln -sf /dlcache dl && ln -sf /stcache staging_dir
-          bp=$DK_PROFILE fc=feeds.conf
-          cp $bp/$fc $fc 2>&- && cp $fc /tmp/feeds.bak
+          cp -f $DK_PROFILE/feeds.conf feeds.conf
           rm -rf feeds/* &>/dev/null
           ./scripts/feeds update -a &>/dev/null || { echo "::error::feeds update failed"; exit 1; }
           ./scripts/feeds install -a &>/dev/null || { echo "::error::feeds install failed"; exit 1; }
-          mv /tmp/feeds.bak $fc &>/dev/null ||:
-          cp $bp/config.diff .config
-          cp -r $bp/files/ .
+          cp $DK_PROFILE/config.diff .config
+          cp -r $DK_PROFILE/files/ .
           rm -f files/build_info  # clear build_info pre-seeded in the base-builder image
           bash $DK_PROFILE/custom.sh
           make defconfig
@@ -149,13 +148,9 @@ jobs:
         # Release list orders by tag name (desc); the standard tag sorts above
         # the OC tag, so ordering is guaranteed without any cross-job waiting.
         gh release create "$VERSION" firmware/*sysupgrade.itb --title "$VERSION" --notes-file firmware/release-notes.md
-        # Remove older releases for this target, but never the one just created.
-        # OC cleanup also matches the legacy "W1700K-OC-Immortalwrt_" prefix.
-        if [ "${{ matrix.target }}" = "ubi2-oc" ]; then
-          gh release list --json tagName --jq '.[].tagName' | grep -Ei "^(W1700K-Immortalwrt-OC_|W1700K-OC-Immortalwrt_)" | grep -vxF "$VERSION" | xargs -r -n1 gh release delete --cleanup-tag -y ||:
-        else
-          gh release list --json tagName --jq '.[].tagName' | grep -i "^W1700K-Immortalwrt_" | grep -vxF "$VERSION" | xargs -r -n1 gh release delete --cleanup-tag -y ||:
-        fi
+        PREFIX="W1700K-ImmortalWrt_"
+        [ "${{ matrix.target }}" = "ubi2-oc" ] && PREFIX="W1700K-ImmortalWrt-OC_"
+        gh release list --json tagName --jq '.[].tagName' | grep -Ei "^(${PREFIX}|W1700K-(OC-)?Immortalwrt_)" | grep -vxF "$VERSION" | xargs -r gh release delete --cleanup-tag -y ||:
 
     - name: Delete old caches
       if: success()

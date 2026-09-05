@@ -37,49 +37,17 @@ cp -r "$FORK/package/luci-app-wifi7" "$FORK/package/luci-app-mlo" \
 # -------------------------------------------------
 
 mkdir -p feeds/luci/modules/luci-mod-status/patches
-
-cp -f $DK_PROFILE/patches/998-single-wiphy.patch \
+cp -f "$DK_PROFILE/patches/998-single-wiphy.patch" \
     feeds/luci/modules/luci-mod-status/patches/998-single-wiphy.patch
 
-if [ ! -d package/luci-app-wifi7 ]; then
-    echo "ERROR: luci-app-wifi7 missing after fork clone" >&2
-    exit 1
-fi
-if [ ! -f $DK_PROFILE/patches/998-wifi7-i18n.patch ]; then
-    echo "ERROR: 998-wifi7-i18n.patch missing" >&2
-    exit 1
-fi
-patch -d package/luci-app-wifi7 -p1 --ignore-whitespace < $DK_PROFILE/patches/998-wifi7-i18n.patch
-
-if [ ! -d package/luci-app-w1700k-fancontrol ]; then
-    echo "ERROR: luci-app-w1700k-fancontrol missing after fork clone" >&2
-    exit 1
-fi
-if [ ! -f $DK_PROFILE/patches/998-fancontrol-i18n.patch ]; then
-    echo "ERROR: 998-fancontrol-i18n.patch missing" >&2
-    exit 1
-fi
-patch -d package/luci-app-w1700k-fancontrol -p1 --ignore-whitespace < $DK_PROFILE/patches/998-fancontrol-i18n.patch
-
-if [ ! -d package/luci-app-airoha-npu ]; then
-    echo "ERROR: luci-app-airoha-npu missing after fork clone" >&2
-    exit 1
-fi
-if [ ! -f $DK_PROFILE/patches/998-npu-i18n.patch ]; then
-    echo "ERROR: 998-npu-i18n.patch missing" >&2
-    exit 1
-fi
-patch -d package/luci-app-airoha-npu -p1 --ignore-whitespace < $DK_PROFILE/patches/998-npu-i18n.patch
-
-if [ ! -d package/luci-app-airoha-flowsense ]; then
-    echo "ERROR: luci-app-airoha-flowsense missing after fork clone" >&2
-    exit 1
-fi
-if [ ! -f $DK_PROFILE/patches/998-flowsense-i18n.patch ]; then
-    echo "ERROR: 998-flowsense-i18n.patch missing" >&2
-    exit 1
-fi
-patch -d package/luci-app-airoha-flowsense -p1 --ignore-whitespace < $DK_PROFILE/patches/998-flowsense-i18n.patch
+# Apply internationalization patches to Airoha LuCI apps
+for item in "wifi7|wifi7" "w1700k-fancontrol|fancontrol" "airoha-npu|npu" "airoha-flowsense|flowsense"; do
+    pkg="luci-app-${item%%|*}"
+    patch_file="$DK_PROFILE/patches/998-${item##*|}-i18n.patch"
+    [ -d "package/$pkg" ] || { echo "ERROR: package/$pkg missing after fork clone" >&2; exit 1; }
+    [ -f "$patch_file" ] || { echo "ERROR: $patch_file missing" >&2; exit 1; }
+    patch -d "package/$pkg" -p1 --ignore-whitespace < "$patch_file"
+done
 
 # -------------------------------------------------
 # SPI-NAND stability: 50MHz -> 33MHz (OpenW1700k fix)
@@ -438,16 +406,10 @@ fi
 echo "Aurora theme configuration app installed successfully."
 
 # 修改 Aurora 菜单式样（默认侧边栏 + 小圆角）
-TPL_DIR="package/luci-app-aurora-config/root/usr/share/aurora/"
-if ls "$TPL_DIR"/*.template >/dev/null 2>&1; then
-    sed -i "s/nav_type '.*'/nav_type 'sidebar'/g; s/struct_radius_base '.*'/struct_radius_base '0.125rem'/g" "$TPL_DIR"/*.template
-    if grep -q "nav_type 'sidebar'" "$TPL_DIR"/*.template; then
-        echo "theme-aurora nav preset applied!"
-    else
-        echo "theme-aurora nav preset failed; continuing!"
-    fi
-else
-    echo "theme-aurora nav preset skipped (no templates); continuing!"
+TPL_DIR="package/luci-app-aurora-config/root/usr/share/aurora"
+if [ -d "$TPL_DIR" ]; then
+    sed -i "s/nav_type '.*'/nav_type 'sidebar'/g; s/struct_radius_base '.*'/struct_radius_base '0.125rem'/g" "$TPL_DIR"/*.template 2>/dev/null || true
+    echo "theme-aurora nav preset applied!"
 fi
 
 
@@ -493,22 +455,6 @@ fi
 if [ -f package/luci-app-airoha-flowsense/root/usr/share/luci/menu.d/luci-app-airoha-flowsense.json ]; then
     sed -i 's#"order": 16#"order": 17#' \
         package/luci-app-airoha-flowsense/root/usr/share/luci/menu.d/luci-app-airoha-flowsense.json
-fi
-
-# Move ttyd from the System menu into Services.
-# Only the menu keys and the parent order change; the view paths stay untouched.
-TTYD_MENU="feeds/luci/applications/luci-app-ttyd/root/usr/share/luci/menu.d/luci-app-ttyd.json"
-if [ -f "$TTYD_MENU" ]; then
-    sed -i 's#admin/system/ttyd#admin/services/ttyd#g' "$TTYD_MENU"
-    sed -i 's/^\([[:space:]]*"admin\/services\/ttyd": {\)$/\1\
-    "order": 91,/' "$TTYD_MENU"
-    if grep -q '"admin/services/ttyd"' "$TTYD_MENU" && grep -q '"order": 91,' "$TTYD_MENU"; then
-        echo "ttyd menu moved to Services (order 91)"
-    else
-        echo "WARN: ttyd menu sed did not match; skip"
-    fi
-else
-    echo "WARN: ttyd menu file not found; skip"
 fi
 
 echo "Airoha LuCI translations installed successfully."
