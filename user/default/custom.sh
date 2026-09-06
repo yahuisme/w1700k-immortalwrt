@@ -78,7 +78,6 @@ fi
 # -------------------------------------------------
 for p in 745-net-pcs-airoha-extend-manual-rx-calib-to-E2-silicon.patch \
          746-net-dsa-mt7530-pre-deassert-phy-reset-gpios-before-mdio-scan.patch \
-         916-02-net-airoha-Implement-HW-GRO-TCP-support.patch \
          992-20-net-airoha-stability.patch \
          992-21-net-airoha-npu-init-stability.patch \
          117-03-airoha_npu_eagle_add_ser.patch \
@@ -114,20 +113,6 @@ for p in "${mt76_patches[@]}"; do
     cp -f "$p" package/kernel/mt76/patches/
 done
 echo "mt76: official package + ${#mt76_patches[@]} mirrored fork patches"
-
-# -------------------------------------------------
-# wifi-scripts: per-interface txpower (fork pr-23990 mirror)
-# -------------------------------------------------
-# The fork carries pr-23990 (per-VIF txpower with verify+retry) on top
-# of openwrt wifi-scripts; mirror it onto ImmortalWrt's ucode script.
-WS_PATCH="$DK_PROFILE/patches/910-wifi-scripts-set-txpower-per-interface.patch"
-if [ -f "$WS_PATCH" ]; then
-    patch -p1 --ignore-whitespace < "$WS_PATCH"
-    echo "wifi-scripts: per-interface txpower patch applied"
-else
-    echo "ERROR: wifi-scripts txpower patch missing"
-    exit 1
-fi
 
 # -------------------------------------------------
 # hostapd: 6G band does not require DFS (fork mtk-0015 mirror)
