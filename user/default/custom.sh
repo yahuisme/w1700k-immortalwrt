@@ -441,7 +441,9 @@ if [ -f package/luci-app-airoha-npu/root/usr/share/luci/menu.d/luci-app-airoha-n
 fi
 FSMENU="package/luci-app-airoha-flowsense/root/usr/share/luci/menu.d/luci-app-airoha-flowsense.json"
 if [ -f "$FSMENU" ]; then
-    sed -i -e 's/"title": "FlowSense"/"title": "Airoha 流量感知"/g'            -e 's/"title": "Airoha FlowSense"/"title": "Airoha 流量感知"/g' "$FSMENU"
+    sed -i -e 's/"title": "FlowSense"/"title": "Airoha 流量感知"/g' \
+           -e 's/"title": "Airoha FlowSense"/"title": "Airoha 流量感知"/g' \
+        "$FSMENU"
 fi
 
 # Move Airoha Fan Control from the System menu into the Status menu, between
@@ -464,9 +466,6 @@ echo "Airoha LuCI translations installed successfully."
 # rescans and registers the new luci-i18n-*-zh-cn packages.
 rm -rf tmp/info 2>/dev/null || true
 rm -f tmp/.packageinfo 2>/dev/null || true
-
-
-
 
 echo "=============================================="
 echo "Custom commands completed"
