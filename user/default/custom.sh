@@ -403,12 +403,6 @@ if [ -f "$BASE_PO" ] && [ -f "$DK_PROFILE/po/zh_Hans/base-custom.po" ]; then
     cat "$DK_PROFILE/po/zh_Hans/base-custom.po" >> "$BASE_PO"
 fi
 
-# Ensure consecutive status menu ordering: npu 15, fan 16, flowsense 17
-if [ -f package/luci-app-airoha-flowsense/root/usr/share/luci/menu.d/luci-app-airoha-flowsense.json ]; then
-    sed -i 's#"order": 16#"order": 17#' \
-        package/luci-app-airoha-flowsense/root/usr/share/luci/menu.d/luci-app-airoha-flowsense.json
-fi
-
 echo "Airoha LuCI configuration completed."
 
 # The package index is generated during feeds install, before these
