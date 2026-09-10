@@ -22,6 +22,14 @@ detect_bridge_ports() {
 }
 
 main() {
+    # Only use the NPU/hardware path when fw4 hardware offload is enabled.
+    if [ "$(uci -q get firewall.@defaults[0].flow_offloading_hw)" != "1" ]; then
+        rm -f "$RULES_FILE"
+        nft delete table bridge fw4 >/dev/null 2>&1
+        logger -t bridge-flow-offload "flow_offloading_hw not set, hardware offload disabled"
+        return 0
+    fi
+
     local devices
     devices=$(detect_bridge_ports)
     if [ -z "$devices" ]; then

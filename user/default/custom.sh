@@ -277,7 +277,14 @@ if grep -q '^CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y' .config 2>/dev/null; the
     if [ -f "$DK_PROFILE/patches/001-oc-cpu-opp-1400mhz.patch" ]; then
         patch -p1 --ignore-whitespace \
             < "$DK_PROFILE/patches/001-oc-cpu-opp-1400mhz.patch"
-        echo "OC OPP patch applied (1.4GHz)"
+        # Match the OC OPP states to the fork's OC PLL fallback formula.
+        PLL_PATCH=target/linux/airoha/patches-6.18/940-pmdomain-airoha-Add-Airoha-CPU-PM-Domain-support.patch
+        if ! grep -qF 'unsigned int freq_mhz = 500 + state * 50;' "$PLL_PATCH"; then
+            echo "ERROR: unexpected PLL frequency baseline; abort" >&2
+            exit 1
+        fi
+        sed -i 's/unsigned int freq_mhz = 500 + state \* 50;/unsigned int freq_mhz = 700 + state * 50;/' "$PLL_PATCH"
+        echo "OC OPP and PLL configured (1.4GHz)"
     else
         echo "ERROR: OC profile but OPP patch missing; abort" >&2
         exit 1
