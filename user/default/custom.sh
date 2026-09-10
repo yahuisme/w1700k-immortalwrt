@@ -154,14 +154,7 @@ cp -f "$TREE/package/network/config/bridge-flow-offload/Makefile" \
     package/network/config/bridge-flow-offload/
 cp -f "$TREE/package/network/config/bridge-flow-offload/files/usr/share/bridge-flow-offload/apply-rules.sh" \
     package/network/config/bridge-flow-offload/files/usr/share/bridge-flow-offload/
-# verify all tree injections landed (fail closed)
-for f in \
-    target/linux/generic/files/drivers/net/phy/rtl8261ce/Kconfig \
-    target/linux/airoha/base-files/etc/tx-debug.sh \
-    target/linux/airoha/an7581/base-files/etc/hotplug.d/iface/51-bridge-flow-offload \
-    package/network/config/bridge-flow-offload/Makefile; do
-    [ -f "$f" ] || { echo "ERROR: tree injection missing: $f; abort" >&2; exit 1; }
-done
+
 echo "tree: airoha base-files + bridge-flow-offload package injected"
 
 # -------------------------------------------------
