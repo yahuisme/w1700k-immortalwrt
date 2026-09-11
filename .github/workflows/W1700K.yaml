@@ -143,11 +143,13 @@ jobs:
         fi
 
     - name: Create release
+      env:
+        GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       run: |
         VERSION="$(cat firmware/version.txt)"
         # Release list orders by tag name (desc); the standard tag sorts above
         # the OC tag, so ordering is guaranteed without any cross-job waiting.
-        gh release create "$VERSION" firmware/*sysupgrade.itb --title "$VERSION" --notes-file firmware/release-notes.md
+        gh release create "$VERSION" firmware/*sysupgrade.itb --target "$GITHUB_SHA" --title "$VERSION" --notes-file firmware/release-notes.md
         PREFIX="W1700K-ImmortalWrt_"
         [ "${{ matrix.target }}" = "ubi2-oc" ] && PREFIX="W1700K-ImmortalWrt-OC_"
         gh release list --json tagName --jq '.[].tagName' | grep -E "^(${PREFIX}|W1700K-${{ matrix.target }}_)" | grep -vxF "$VERSION" | xargs -r -n1 gh release delete --cleanup-tag -y ||:
