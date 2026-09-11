@@ -91,7 +91,7 @@ done
 # -------------------------------------------------
 # mt76: ImmortalWrt official package + mirrored fork patches
 # -------------------------------------------------
-# Keep ImmortalWrt's official mt76 (openwrt/mt76 @ 59676919). The fork's
+# Keep ImmortalWrt's rolling official mt76 package. The fork's
 # snapshot (01367e60) requires kernel 7.x mac80211 API and does not build
 # on the 6.18 backport, so mirror the fork's own mt76 patches on top of
 # the official package instead. They apply after the official 100 patch;

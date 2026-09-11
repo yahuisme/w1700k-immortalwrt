@@ -17,7 +17,7 @@ endef
 
 define Package/bridge-flow-offload/description
   Adds nftables bridge flowtable offloading rules after firewall4
-  initialization. Detects bridge member ports dynamically and creates
+  reloads. Detects bridge member ports dynamically and creates
   a bridge-family flowtable with hardware offload support.
 endef
 
