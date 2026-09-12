@@ -85,10 +85,6 @@ jobs:
           git remote set-url origin $REPO_URL 2>&- || git remote add origin $REPO_URL
           git fetch origin "+refs/heads/$REPO_BRANCH:refs/remotes/origin/$REPO_BRANCH" && git checkout -f $REPO_BRANCH
           git reset --hard origin/$REPO_BRANCH
-          # Deterministic tree: force kernel re-prepare so injected drivers
-          # (rtl8261ce) and dts changes are always patched, while keeping
-          # compiled objects intact so incremental compilation stays fast.
-          rm -f build_dir/target-*/linux-*/.prepared* build_dir/target-*/linux-*/.config*
           mountpoint $DK_BIN || { echo "::error::not mounted" >&2; exit 1; }
           rm -rf bin dl staging_dir build_dir
           ln -s $DK_BIN bin && ln -s /dlcache dl
@@ -101,14 +97,13 @@ jobs:
           rm -f files/build_info  # clear build_info pre-seeded in the base-builder image
           bash $DK_PROFILE/custom.sh
           make defconfig
-          # OC profile bumps the embedded version code by 1 so the LuCI
-          # overview and the release tag both read rNNNNN+1 (profiles.json
-          # version_code is derived from VERSION_CODE below).
+          # getver supplies both REVISION and VERSION_CODE; bump OC once at
+          # that source so base-files and image metadata keep the same version.
           if [ "${{ matrix.target }}" = "ubi2-oc" ]; then
+            rm -f version  # discard an earlier generated OC version
             REV=$(./scripts/getver.sh)
-            VCODE=$(echo "$REV" | sed -E "s/^r([0-9]+).*/\1/")
-            VHASH=$(echo "$REV" | sed -E "s/^r[0-9]+[-+]?//")
-            echo "CONFIG_VERSION_CODE=r$((VCODE + 1))-$VHASH" >> .config
+            [[ "$REV" =~ ^r([0-9]+)(-[0-9a-f]+)$ ]] || { echo "::error::Unexpected revision: $REV"; exit 1; }
+            printf "r%s%s\n" "$((10#${BASH_REMATCH[1]} + 1))" "${BASH_REMATCH[2]}" > version
           fi
           echo "CONFIG_VERSION_NUMBER=${{ matrix.target }}" >> .config
           make download -j8 || exit 1

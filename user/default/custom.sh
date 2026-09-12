@@ -64,7 +64,7 @@ fi
 
 # -------------------------------------------------
 # W1700K platform fixes from OpenW1700k (quilt-applied)
-# 745 pcs E2 calib / 746 mt7530 reset / 916-02 GRO_HW /
+# 745 pcs E2 calib / 746 mt7530 reset /
 # 992-20 stability / 117-03 npu timeout / 992-21 npu init stability /
 # 910-02 usb-pcie clk /
 # 939 SMCCC cpufreq / 940 CPU pmdomain (PLL fallback) /
@@ -148,6 +148,8 @@ mkdir -p target/linux/airoha/base-files/etc
 cp -f "$TREE/target/linux/airoha/base-files/etc/tx-debug.sh" \
     target/linux/airoha/base-files/etc/
 cp -r "$FORK/package/network/config/bridge-hw-offload" package/network/config/
+# Fix the upstream bridge service API and clear rules when no ports remain.
+patch --batch --forward -p1 < "$DK_PROFILE/patches/920-bridge-hw-offload-lifecycle.patch"
 
 echo "tree: airoha base-files + bridge-hw-offload package injected"
 
