@@ -179,22 +179,6 @@ else
 fi
 
 # -------------------------------------------------
-# Default packages: eip93 crypto + bridge-hw-offload (fork target.mk mirror)
-# -------------------------------------------------
-TMK=target/linux/airoha/an7581/target.mk
-if grep -q 'kmod-crypto-hw-eip93' "$TMK"; then
-    echo "target.mk: eip93/flow-offload already present"
-else
-    sed -i 's#\tairoha-en7581-npu-firmware uboot-envtools#\tairoha-en7581-npu-firmware uboot-envtools kmod-crypto-hw-eip93 \\\n\tbridge-hw-offload#' "$TMK"
-    if grep -q 'kmod-crypto-hw-eip93' "$TMK" && grep -q 'bridge-hw-offload' "$TMK"; then
-        echo "target.mk: +kmod-crypto-hw-eip93 +bridge-hw-offload"
-    else
-        echo "ERROR: target.mk sed did not match; abort"
-        exit 1
-    fi
-fi
-
-# -------------------------------------------------
 # rtl8261ce kmod definition (fork netdevices.mk mirror)
 # -------------------------------------------------
 NDM=package/kernel/linux/modules/netdevices.mk
@@ -217,25 +201,6 @@ endef
 $(eval $(call KernelPackage,phy-rtl8261ce))
 EOF
     echo "netdevices.mk: phy-rtl8261ce kmod added"
-fi
-
-# Enable the RTL8261CE PHY driver in the W1700K DEVICE_PACKAGES (fork
-# an7581.mk ships `rtl826x-firmware kmod-phy-rtl8261ce`; ImmortalWrt's
-# own an7581.mk stops at rtl826x-firmware). Without this the driver is
-# defined but never selected, and the firmware misses 10G PHY support.
-ANM=target/linux/airoha/image/an7581.mk
-if grep -q 'rtl826x-firmware kmod-phy-rtl8261ce' "$ANM"; then
-    echo "an7581.mk: kmod-phy-rtl8261ce already in W1700K DEVICE_PACKAGES"
-elif grep -q 'rtl826x-firmware' "$ANM"; then
-    sed -i 's/rtl826x-firmware$/rtl826x-firmware kmod-phy-rtl8261ce/' "$ANM"
-    if grep -q 'rtl826x-firmware kmod-phy-rtl8261ce' "$ANM"; then
-        echo "an7581.mk: +kmod-phy-rtl8261ce in W1700K DEVICE_PACKAGES"
-    else
-        echo "ERROR: an7581.mk sed did not match; abort" >&2
-        exit 1
-    fi
-else
-    echo "WARN: rtl826x-firmware not found in $ANM; skip"
 fi
 
 # -------------------------------------------------
@@ -382,10 +347,16 @@ echo "Aurora theme configuration app installed successfully."
 
 # 修改 Aurora 菜单式样（默认侧边栏 + 小圆角）
 TPL_DIR="package/luci-app-aurora-config/root/usr/share/aurora"
-if [ -d "$TPL_DIR" ]; then
-    sed -i "s/nav_type '.*'/nav_type 'sidebar'/g; s/struct_radius_base '.*'/struct_radius_base '0.125rem'/g" "$TPL_DIR"/*.template 2>/dev/null || true
-    echo "theme-aurora nav preset applied!"
-fi
+[ -f "$TPL_DIR/default.template" ] || { echo "ERROR: Aurora default template missing" >&2; exit 1; }
+for tpl in "$TPL_DIR"/*.template; do
+    sed -i "s/nav_type '.*'/nav_type 'sidebar'/g; s/struct_radius_base '.*'/struct_radius_base '0.125rem'/g" "$tpl"
+    if ! grep -q "^[[:space:]]*option nav_type 'sidebar'[[:space:]]*$" "$tpl" \
+        || ! grep -q "^[[:space:]]*option struct_radius_base '0\.125rem'[[:space:]]*$" "$tpl"; then
+        echo "ERROR: Aurora preset template mismatch: $tpl" >&2
+        exit 1
+    fi
+done
+echo "theme-aurora nav preset applied!"
 
 
 # -------------------------------------------------
@@ -402,9 +373,9 @@ fi
 
 echo "Airoha LuCI configuration completed."
 
-# The package index is generated during feeds install, before these
-# translation files existed. Drop the cached index so make defconfig
-# rescans and registers the new luci-i18n-*-zh-cn packages.
+# Feeds install indexed packages before the custom apps, theme and PHY
+# recipe were injected. Drop the index so make defconfig discovers them
+# and their built-in luci-i18n-*-zh-cn packages.
 rm -rf tmp/info 2>/dev/null || true
 rm -f tmp/.packageinfo 2>/dev/null || true
 

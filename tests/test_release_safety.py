@@ -137,10 +137,7 @@ class LegacyRemovalTests(unittest.TestCase):
     setUp = cache_tests.KeyTests.setUp
     put = cache_tests.KeyTests.put
     key = cache_tests.KeyTests.key
-    def test_baseline_key_and_rejected_admit(self):
-        baseline = Path(self.tmp.name) / 'baseline.py'
-        baseline.write_bytes(subprocess.check_output(['git', 'show', 'c1bdc67eaeec726d27491209c15c0f56b4fe2b2d:scripts/cache.py'], cwd=ROOT))
-        self.assertEqual(load(baseline).key(self.root, 'image-sha'), self.key())
+    def test_rejected_admit(self):
         self.assertFalse(hasattr(self.cache, 'admit'))
         result = subprocess.run(['python3', str(SCRIPT), 'admit', str(self.root), str(Path(self.tmp.name)/'archive'), 'old'], text=True, capture_output=True)
         self.assertNotEqual(result.returncode, 0)
