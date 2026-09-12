@@ -32,7 +32,9 @@ if ! git clone --depth=1 --filter=blob:none --sparse --branch ubi2 \
 fi
 git -C "$FORK" sparse-checkout set \
     target/linux/airoha/patches-6.18 \
-    package/network/utils/iwinfo/patches
+    package/network/utils/iwinfo/patches \
+    target/linux/generic/pending-6.18 \
+    package/network/config/bridge-hw-offload
 
 # -------------------------------------------------
 # Existing W1700K custom files
@@ -124,7 +126,7 @@ echo "dropbear: quiet session logs patch installed"
 # -------------------------------------------------
 # Kernel: bridge flow offload + rtl8261ce PHY (fork mirror)
 # -------------------------------------------------
-cp -f "$DK_PROFILE"/patches/675-0[123]-*.patch target/linux/generic/pending-6.18/
+cp -f "$FORK"/target/linux/generic/pending-6.18/675-0[123]-*.patch target/linux/generic/pending-6.18/
 cp -f "$DK_PROFILE/patches/999-net-phy-realtek-rtl8261ce.patch" \
     target/linux/generic/hack-6.18/
 echo "kernel: bridge flow offload + rtl8261ce PHY patches installed"
@@ -145,16 +147,9 @@ echo "rtl8261ce: driver files injected into target/linux/generic/files"
 mkdir -p target/linux/airoha/base-files/etc
 cp -f "$TREE/target/linux/airoha/base-files/etc/tx-debug.sh" \
     target/linux/airoha/base-files/etc/
-mkdir -p target/linux/airoha/an7581/base-files/etc/hotplug.d/iface
-cp -f "$TREE/target/linux/airoha/an7581/base-files/etc/hotplug.d/iface/51-bridge-flow-offload" \
-    target/linux/airoha/an7581/base-files/etc/hotplug.d/iface/
-mkdir -p package/network/config/bridge-flow-offload/files/usr/share/bridge-flow-offload
-cp -f "$TREE/package/network/config/bridge-flow-offload/Makefile" \
-    package/network/config/bridge-flow-offload/
-cp -f "$TREE/package/network/config/bridge-flow-offload/files/usr/share/bridge-flow-offload/apply-rules.sh" \
-    package/network/config/bridge-flow-offload/files/usr/share/bridge-flow-offload/
+cp -r "$FORK/package/network/config/bridge-hw-offload" package/network/config/
 
-echo "tree: airoha base-files + bridge-flow-offload package injected"
+echo "tree: airoha base-files + bridge-hw-offload package injected"
 
 # -------------------------------------------------
 # ramoops/pstore: crash log region (fork mirror)
@@ -182,15 +177,15 @@ else
 fi
 
 # -------------------------------------------------
-# Default packages: eip93 crypto + bridge-flow-offload (fork target.mk mirror)
+# Default packages: eip93 crypto + bridge-hw-offload (fork target.mk mirror)
 # -------------------------------------------------
 TMK=target/linux/airoha/an7581/target.mk
 if grep -q 'kmod-crypto-hw-eip93' "$TMK"; then
     echo "target.mk: eip93/flow-offload already present"
 else
-    sed -i 's#\tairoha-en7581-npu-firmware uboot-envtools#\tairoha-en7581-npu-firmware uboot-envtools kmod-crypto-hw-eip93 \\\n\tbridge-flow-offload#' "$TMK"
-    if grep -q 'kmod-crypto-hw-eip93' "$TMK" && grep -q 'bridge-flow-offload' "$TMK"; then
-        echo "target.mk: +kmod-crypto-hw-eip93 +bridge-flow-offload"
+    sed -i 's#\tairoha-en7581-npu-firmware uboot-envtools#\tairoha-en7581-npu-firmware uboot-envtools kmod-crypto-hw-eip93 \\\n\tbridge-hw-offload#' "$TMK"
+    if grep -q 'kmod-crypto-hw-eip93' "$TMK" && grep -q 'bridge-hw-offload' "$TMK"; then
+        echo "target.mk: +kmod-crypto-hw-eip93 +bridge-hw-offload"
     else
         echo "ERROR: target.mk sed did not match; abort"
         exit 1
