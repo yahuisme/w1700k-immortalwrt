@@ -150,7 +150,10 @@ jobs:
     - name: Stage firmware
       run: |
         sudo chown -R "$(id -u):$(id -g)" openwrt_bin
-        find -L openwrt_bin/targets/*/* -maxdepth 1 \( -name '*sysupgrade.itb' -o -name 'profiles.json' \) -exec install -D -t firmware {} +
+        docker_exec DK cat "$DK_OPENWRT/.config" > final.config
+        python3 scripts/validate_firmware.py final.config openwrt_bin/targets
+        mkdir firmware
+        install -t firmware openwrt_bin/targets/airoha/an7581/immortalwrt-airoha-an7581-gemtek_w1700k-ubi-squashfs-sysupgrade.itb openwrt_bin/targets/airoha/an7581/profiles.json
         PREFIX="W1700K-ImmortalWrt_"
         [ "${{ matrix.target }}" = "ubi2-oc" ] && PREFIX="W1700K-ImmortalWrt-OC_"
         VERSION="${PREFIX%_}-r$(jq -r '.version_code' firmware/profiles.json | sed 's/^r//; s/-.*//')-$(TZ=Asia/Hong_Kong date +'%y.%m.%d-%H.%M.%S')"
@@ -190,10 +193,24 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       run: |
+        # Read-only freshness gate; API errors/malformed replies fail closed.
+        # This check and create are NOT atomic: main may advance between them.
+        current_main() {
+          local head
+          head=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha') || return 1
+          [[ "$head" =~ ^[0-9a-f]{40}$ ]] || return 1
+          if [ "$head" != "$GITHUB_SHA" ]; then
+            echo '::notice::Obsolete build: skipping release mutations; caches may continue.'
+            exit 0
+          fi
+        }
+        current_main
         VERSION="$(cat firmware/version.txt)"
         # Release list orders by tag name (desc); the standard tag sorts above
         # the OC tag, so ordering is guaranteed without any cross-job waiting.
         gh release create "$VERSION" firmware/*sysupgrade.itb --target "$GITHUB_SHA" --title "$VERSION" --notes-file firmware/release-notes.md
+        # Recheck before pruning, without serializing the matrix/cache writers.
+        current_main
         PREFIX="W1700K-ImmortalWrt_"
         [ "${{ matrix.target }}" = "ubi2-oc" ] && PREFIX="W1700K-ImmortalWrt-OC_"
         gh release list --json tagName --jq '.[].tagName' | grep -E "^(${PREFIX}|${PREFIX%_}-r[0-9]+-|W1700K-${{ matrix.target }}_)" | grep -vxF "$VERSION" | xargs -r -n1 gh release delete --cleanup-tag -y ||:
