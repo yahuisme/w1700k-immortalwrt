@@ -35,7 +35,7 @@ class ReleaseTests(unittest.TestCase):
         return output, data
 
     def stage(self, base, target='ubi2'):
-        block = 'sudo() { "$@"; }; docker_exec() { shift; "$@"; };\n' + render(step('Stage firmware')['run'], {'matrix.target': target})
+        block = 'sudo() { "$@"; }; docker_exec() { shift; "$@"; };\n' + render(step('Validate and stage firmware')['run'], {'matrix.target': target})
         return subprocess.run(['bash', '-eo', 'pipefail', '-c', block], cwd=base,
                               env=dict(os.environ, DK_OPENWRT=str(base)), text=True, capture_output=True)
 
@@ -116,7 +116,7 @@ elif args[:2]!=['release','delete']: sys.exit(99)
                     (base / 'tags').write_text('\n'.join(standard + oc + [version, 'unrelated']))
                     env = dict(os.environ, PATH=tmp + ':' + os.environ['PATH'], STUB_ROOT=tmp, CASE=case,
                                GITHUB_SHA='a'*40, GITHUB_REPOSITORY='fixture/repo')
-                    result = subprocess.run(['bash', '-eo', 'pipefail', '-c', render(step('Create release')['run'], {'matrix.target': target})], cwd=base, env=env, text=True, capture_output=True)
+                    result = subprocess.run(['bash', '-eo', 'pipefail', '-c', render(step('Publish firmware and prune old releases')['run'], {'matrix.target': target})], cwd=base, env=env, text=True, capture_output=True)
                     calls = [json.loads(line) for line in (base / 'calls').read_text().splitlines()]
                     creates = [c for c in calls if c[:2] == ['release', 'create']]
                     deletes = [c[-1] for c in calls if c[:2] == ['release', 'delete']]
@@ -127,7 +127,7 @@ elif args[:2]!=['release','delete']: sys.exit(99)
                     self.assertEqual(calls[0], ['api', 'repos/fixture/repo/git/ref/heads/main', '--jq', '.object.sha'])
                     if case == 'stale':
                         # A successful skipped publication leaves ordinary cache steps runnable.
-                        block = 'docker_exec() { printf "%s\\n" "$*"; }; sudo() { :; };\n' + render(step('Pack caches')['run'], {'matrix.target': target, 'steps.tc.outputs.cache-hit': 'true'})
+                        block = 'docker_exec() { printf "%s\\n" "$*"; }; sudo() { :; };\n' + render(step('Package build caches')['run'], {'matrix.target': target, 'steps.tc.outputs.cache-hit': 'true'})
                         packed = subprocess.run(['bash', '-e', '-c', block], cwd=base, env=env, capture_output=True, text=True)
                         self.assertEqual(packed.returncode, 0)
                         self.assertIn('cache.py ccache', packed.stdout)

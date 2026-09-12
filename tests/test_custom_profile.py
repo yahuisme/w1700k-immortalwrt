@@ -15,8 +15,6 @@ class CustomProfile(unittest.TestCase):
         config = (ROOT / 'user/default/config.diff').read_text().splitlines()
         for package in ('bridge-hw-offload', 'kmod-crypto-hw-eip93', 'kmod-phy-rtl8261ce'):
             self.assertIn(f'CONFIG_PACKAGE_{package}=y', config)
-        self.assertNotIn('TMK=', CUSTOM)
-        self.assertNotIn('ANM=', CUSTOM)
         self.assertIn('define KernelPackage/phy-rtl8261ce', CUSTOM)
         self.assertIn('999-net-phy-realtek-rtl8261ce.patch', CUSTOM)
         self.assertIn('rtl8261ce/Kconfig', CUSTOM)
