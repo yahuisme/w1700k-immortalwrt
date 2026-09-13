@@ -198,7 +198,8 @@ jobs:
         VERSION="$(cat firmware/version.txt)"
         # Release list orders by tag name (desc); the standard tag sorts above
         # the OC tag, so ordering is guaranteed without any cross-job waiting.
-        gh release create "$VERSION" firmware/*sysupgrade.itb --target "$GITHUB_SHA" --title "$VERSION" --notes-file firmware/release-notes.md
+        RELEASE_TITLE="${VERSION%-*}_${VERSION##*-}"
+        gh release create "$VERSION" firmware/*sysupgrade.itb --target "$GITHUB_SHA" --title "$RELEASE_TITLE" --notes-file firmware/release-notes.md
         # Recheck before pruning, without serializing the matrix/cache writers.
         current_main
         PREFIX="W1700K-ImmortalWrt_"
