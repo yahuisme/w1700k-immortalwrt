@@ -21,7 +21,15 @@ CONFIG_TARGET_SUBTARGET="an7581"
 
 
 class ReleaseTests(unittest.TestCase):
-    def fixture(self, base):
+    def kernel(self, base, target='ubi2'):
+        path = base / 'build_dir/target-aarch64_cortex-a53_musl/linux-airoha_an7581/linux-6.18.1/.config'
+        path.parent.mkdir(parents=True, exist_ok=True)
+        governor = 'PERFORMANCE' if target == 'ubi2-oc' else 'ONDEMAND'
+        path.write_text(f'CONFIG_CPU_FREQ_DEFAULT_GOV_{governor}=y\n# CONFIG_TEST_SECRET is not set\n')
+        return path
+
+    def fixture(self, base, target='ubi2'):
+        self.kernel(base, target)
         (base / 'scripts').symlink_to(ROOT / 'scripts')
         output = base / 'openwrt_bin/targets/airoha/an7581'
         output.mkdir(parents=True)
@@ -46,7 +54,7 @@ class ReleaseTests(unittest.TestCase):
                      'metadata-name', 'filesystem', 'revision', 'other-target'):
             with self.subTest(case=case), tempfile.TemporaryDirectory() as tmp:
                 base = Path(tmp)
-                out, data = self.fixture(base)
+                out, data = self.fixture(base, 'ubi2-oc' if case == 'oc' else 'ubi2')
                 profile = data['profiles']['gemtek_w1700k-ubi']
                 config = base / '.config'
                 image = out / IMAGE
@@ -83,12 +91,54 @@ class ReleaseTests(unittest.TestCase):
                     self.assertNotEqual(result.returncode, 0, case)
                     self.assertFalse((base / 'firmware').exists())
 
+    def test_final_kernel_governor_gate(self):
+        for target in ('ubi2', 'ubi2-oc'):
+            for case in ('valid', 'headers-ignored', 'missing', 'headers-only',
+                         'headers-nested', 'target-headers-only', 'wrong-target', 'multiple', 'wrong',
+                         'opposite', 'duplicate', 'two-defaults', 'empty', 'unset'):
+                with self.subTest(target=target, case=case), tempfile.TemporaryDirectory() as tmp:
+                    base = Path(tmp)
+                    self.fixture(base, target)
+                    kernel = self.kernel(base, target)
+                    expected = 'PERFORMANCE' if target == 'ubi2-oc' else 'ONDEMAND'
+                    good = kernel.read_text()
+                    if case in ('missing', 'headers-only', 'headers-nested', 'target-headers-only', 'wrong-target'):
+                        kernel.unlink()
+                    if case in ('headers-only', 'headers-ignored', 'headers-nested', 'target-headers-only', 'wrong-target', 'multiple'):
+                        locations = {
+                            'target-headers-only': 'target-aarch64_cortex-a53_musl/linux-airoha_an7581/linux-headers/.config',
+                            'headers-only': 'toolchain-aarch64/linux-6.18.1/.config',
+                            'headers-ignored': 'target-aarch64_cortex-a53_musl/linux-airoha_an7581/linux-headers/.config',
+                            'headers-nested': 'target-aarch64_cortex-a53_musl/linux-airoha_an7581/linux-headers/linux-6.18.1/.config',
+                            'wrong-target': 'target-aarch64_cortex-a53_musl/linux-mediatek_filogic/linux-6.18.1/.config',
+                            'multiple': 'target-aarch64_cortex-a53_musl/linux-airoha_an7581/linux-6.18.2/.config',
+                        }
+                        extra = base / 'build_dir' / locations[case]
+                        extra.parent.mkdir(parents=True, exist_ok=True)
+                        extra.write_text(good)
+                    if case == 'opposite':
+                        other = 'ONDEMAND' if expected == 'PERFORMANCE' else 'PERFORMANCE'
+                        kernel.write_text(f'CONFIG_CPU_FREQ_DEFAULT_GOV_{other}=y\n')
+                    if case == 'duplicate': kernel.write_text(good + good)
+                    if case == 'wrong': kernel.write_text('CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=y\n')
+                    if case == 'two-defaults': kernel.write_text(good + 'CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=y\n')
+                    if case == 'empty': kernel.write_text('')
+                    if case == 'unset': kernel.write_text(f'# CONFIG_CPU_FREQ_DEFAULT_GOV_{expected} is not set\n')
+                    result = self.stage(base, target)
+                    if case in ('valid', 'headers-ignored'):
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        self.assertIn(f'Verified kernel governor: CONFIG_CPU_FREQ_DEFAULT_GOV_{expected}=y', result.stdout)
+                        self.assertNotIn('CONFIG_TEST_SECRET', result.stdout)
+                    else:
+                        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                        self.assertFalse((base / 'firmware').exists())
+
     def test_publish_freshness_and_matrix_isolation(self):
         for target in ('ubi2', 'ubi2-oc'):
             for case in ('fresh', 'stale', 'error', 'empty', 'malformed', 'advance', 'recheck-error', 'create-error'):
                 with self.subTest(target=target, case=case), tempfile.TemporaryDirectory() as tmp:
                     base = Path(tmp)
-                    self.fixture(base)
+                    self.fixture(base, target)
                     result = self.stage(base, target)
                     self.assertEqual(result.returncode, 0, result.stderr)
                     gh = base / 'gh'
