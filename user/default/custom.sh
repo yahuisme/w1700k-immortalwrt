@@ -235,6 +235,17 @@ fi
 # Triggered by performance governor in config.diff
 # -------------------------------------------------
 if grep -q '^CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y' .config 2>/dev/null; then
+    # The input symbol is only an OC trigger; defconfig strips it.
+    # Select the governor in the kernel fragment, not the top-level config.
+    KERNEL_CONFIG=target/linux/airoha/an7581/config-6.18
+    if ! grep -qx 'CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y' "$KERNEL_CONFIG" \
+        || ! grep -qx '# CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE is not set' "$KERNEL_CONFIG"; then
+        echo "ERROR: unexpected CPU governor baseline; abort" >&2
+        exit 1
+    fi
+    sed -i -e 's/^\(CONFIG_CPU_FREQ_DEFAULT_GOV_.*\)=y$/# \1 is not set/' \
+           -e 's/^# CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE is not set$/CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y/' \
+        "$KERNEL_CONFIG"
     if [ -f "$DK_PROFILE/patches/001-oc-cpu-opp-1400mhz.patch" ]; then
         patch -p1 --ignore-whitespace \
             < "$DK_PROFILE/patches/001-oc-cpu-opp-1400mhz.patch"
