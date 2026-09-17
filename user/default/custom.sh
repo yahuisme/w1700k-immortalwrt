@@ -68,7 +68,7 @@ fi
 # 992-20 stability / 117-03 npu timeout / 992-21 npu init stability /
 # 910-02 usb-pcie clk /
 # 939 SMCCC cpufreq / 940 CPU pmdomain (PLL fallback) /
-# 998 log silence / 9990 hw gro state
+# 998 log silence / 994 hw gro state
 # Copied from the fork at build time to track upstream latest.
 # -------------------------------------------------
 for p in 745-net-pcs-airoha-extend-manual-rx-calib-to-E2-silicon.patch \
@@ -80,7 +80,7 @@ for p in 745-net-pcs-airoha-extend-manual-rx-calib-to-E2-silicon.patch \
          939-cpufreq-airoha-Add-EN7581-CPUFreq-SMCCC-driver.patch \
          940-pmdomain-airoha-Add-Airoha-CPU-PM-Domain-support.patch \
          998-silence-PHY-LED-pinctrl-error.patch \
-         9990-net-airoha-share-hw-gro-state-across-qdma-users.patch; do
+         994-net-airoha-share-hw-gro-state-across-qdma-users.patch; do
     if [ -f "$FORK/target/linux/airoha/patches-6.18/$p" ]; then
         cp -f "$FORK/target/linux/airoha/patches-6.18/$p" target/linux/airoha/patches-6.18/
         echo "platform patch: $p"
@@ -126,7 +126,9 @@ echo "dropbear: quiet session logs patch installed"
 # -------------------------------------------------
 # Kernel: bridge flow offload + rtl8261ce PHY (fork mirror)
 # -------------------------------------------------
-cp -f "$FORK"/target/linux/generic/pending-6.18/675-0[123]-*.patch target/linux/generic/pending-6.18/
+# Bridge patches are rebased to official 6.18.44's forward-path API.
+# The rolling donor now requires the newer 6.18.52 backport chain.
+cp -f "$DK_PROFILE"/patches/675-0[123]-*.patch target/linux/generic/pending-6.18/
 cp -f "$DK_PROFILE/patches/999-net-phy-realtek-rtl8261ce.patch" \
     target/linux/generic/hack-6.18/
 echo "kernel: bridge flow offload + rtl8261ce PHY patches installed"
@@ -148,7 +150,7 @@ mkdir -p target/linux/airoha/base-files/etc
 cp -f "$TREE/target/linux/airoha/base-files/etc/tx-debug.sh" \
     target/linux/airoha/base-files/etc/
 cp -r "$FORK/package/network/config/bridge-hw-offload" package/network/config/
-# Fix the upstream bridge service API and clear rules when no ports remain.
+# Fix the upstream procd instance API; retain upstream rule lifecycle.
 patch --batch --forward -p1 < "$DK_PROFILE/patches/920-bridge-hw-offload-lifecycle.patch"
 
 echo "tree: airoha base-files + bridge-hw-offload package injected"
