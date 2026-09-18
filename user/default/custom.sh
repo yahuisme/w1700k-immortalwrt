@@ -34,7 +34,8 @@ git -C "$FORK" sparse-checkout set \
     target/linux/airoha/patches-6.18 \
     package/network/utils/iwinfo/patches \
     target/linux/generic/pending-6.18 \
-    package/network/config/bridge-hw-offload
+    package/network/config/firewall4/patches \
+    target/linux/airoha/an7581/base-files/etc/hotplug.d
 
 # -------------------------------------------------
 # Existing W1700K custom files
@@ -126,8 +127,8 @@ echo "dropbear: quiet session logs patch installed"
 # -------------------------------------------------
 # Kernel: bridge flow offload + rtl8261ce PHY (fork mirror)
 # -------------------------------------------------
-# Bridge patches are rebased to official 6.18.44's forward-path API.
-# The rolling donor now requires the newer 6.18.52 backport chain.
+# Bridge patches retain the official kernel's forward-path API.
+# The rolling donor uses a newer API despite sharing the kernel version.
 cp -f "$DK_PROFILE"/patches/675-0[123]-*.patch target/linux/generic/pending-6.18/
 cp -f "$DK_PROFILE/patches/999-net-phy-realtek-rtl8261ce.patch" \
     target/linux/generic/hack-6.18/
@@ -149,11 +150,19 @@ echo "rtl8261ce: driver files injected into target/linux/generic/files"
 mkdir -p target/linux/airoha/base-files/etc
 cp -f "$TREE/target/linux/airoha/base-files/etc/tx-debug.sh" \
     target/linux/airoha/base-files/etc/
-cp -r "$FORK/package/network/config/bridge-hw-offload" package/network/config/
-# Fix the upstream procd instance API; retain upstream rule lifecycle.
-patch --batch --forward -p1 < "$DK_PROFILE/patches/920-bridge-hw-offload-lifecycle.patch"
+# Follow the donor's native bridge offload stack.  The old standalone
+# bridge-hw-offload package was replaced by fw4's bridge flowtable.
+mkdir -p package/network/config/firewall4/patches \
+    target/linux/airoha/an7581/base-files/etc/hotplug.d/{iface,net}
+cp -f "$FORK/package/network/config/firewall4/patches/001-add-bridge-flowtable-support.patch" \
+    package/network/config/firewall4/patches/
 
-echo "tree: airoha base-files + bridge-hw-offload package injected"
+cp -f "$FORK/target/linux/airoha/an7581/base-files/etc/hotplug.d/iface/51-bridge-hw-offload" \
+    target/linux/airoha/an7581/base-files/etc/hotplug.d/iface/
+cp -f "$FORK/target/linux/airoha/an7581/base-files/etc/hotplug.d/net/50-bridge-hw-offload" \
+    target/linux/airoha/an7581/base-files/etc/hotplug.d/net/
+
+echo "tree: airoha base-files + native bridge offload stack injected"
 
 # -------------------------------------------------
 # ramoops/pstore: crash log region (fork mirror)
