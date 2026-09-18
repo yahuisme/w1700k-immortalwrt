@@ -81,6 +81,7 @@ for p in 745-net-pcs-airoha-extend-manual-rx-calib-to-E2-silicon.patch \
          939-cpufreq-airoha-Add-EN7581-CPUFreq-SMCCC-driver.patch \
          940-pmdomain-airoha-Add-Airoha-CPU-PM-Domain-support.patch \
          998-silence-PHY-LED-pinctrl-error.patch \
+         993-net-airoha-enable-RX_DONE-interrupt-for-RX-queue-31.patch \
          994-net-airoha-share-hw-gro-state-across-qdma-users.patch; do
     if [ -f "$FORK/target/linux/airoha/patches-6.18/$p" ]; then
         cp -f "$FORK/target/linux/airoha/patches-6.18/$p" target/linux/airoha/patches-6.18/
