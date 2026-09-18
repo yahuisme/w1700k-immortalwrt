@@ -178,9 +178,9 @@
 +	if (nft_dev_fill_forward_path(&ctx, dst, ct, dir, ha, &stack) >= 0)
  		nft_dev_path_info(&stack, &info, ha, &ft->data);
  
-+	if (info.outdev)
-+		route->tuple[dir].out.ifindex = info.outdev->ifindex;
-+
+ 	if (info.outdev)
+ 		route->tuple[dir].out.ifindex = info.outdev->ifindex;
+ 
 -	if (!info.indev || !nft_flowtable_find_dev(info.indev, ft))
 -		return;
 +	if (!info.indev ||
