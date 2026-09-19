@@ -46,7 +46,7 @@ class OfficialBaselineTests(unittest.TestCase):
 
     def test_missing_each_application_or_translation_blocks_release(self):
         helper = releases.ReleaseTests()
-        for app in ('airoha-fancontrol', 'airoha-flowsense', 'airoha-npu', 'wifi7', 'wol', 'ttyd', 'usteer'):
+        for app in ('airoha-fancontrol', 'airoha-flowsense', 'airoha-npu', 'wifi7', 'wol', 'ttyd'):
             for pkg in ('luci-app-' + app, 'luci-i18n-' + app + '-zh-cn'):
                 with self.subTest(package=pkg), tempfile.TemporaryDirectory() as tmp:
                     base = Path(tmp)

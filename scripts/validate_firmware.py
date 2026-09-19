@@ -20,13 +20,16 @@ def validate(config, targets):
                      'CONFIG_TARGET_BOARD="airoha"', 'CONFIG_TARGET_SUBTARGET="an7581"'):
         if lines.count(required) != 1:
             raise ValueError('missing/duplicate final target: ' + required)
-    for app in ('airoha-fancontrol', 'airoha-flowsense', 'airoha-npu', 'wifi7', 'wol', 'ttyd', 'usteer'):
+    for app in ('airoha-fancontrol', 'airoha-flowsense', 'airoha-npu', 'wifi7', 'wol', 'ttyd'):
         for package in ('luci-app-' + app, 'luci-i18n-' + app + '-zh-cn'):
             if lines.count('CONFIG_PACKAGE_' + package + '=y') != 1:
                 raise ValueError('missing/duplicate required application: ' + package)
-    for package in ('etherwake', 'ttyd', 'usteer', 'wpad-openssl'):
+    for package in ('etherwake', 'ttyd', 'wpad-openssl'):
         if lines.count('CONFIG_PACKAGE_' + package + '=y') != 1:
             raise ValueError('missing/duplicate required dependency: ' + package)
+    for package in ('usteer', 'luci-app-usteer', 'luci-i18n-usteer-zh-cn'):
+        if any('CONFIG_PACKAGE_' + package + '=' + state in lines for state in ('y', 'm')):
+            raise ValueError('Forbidden package: ' + package)
     devices = [line for line in lines if re.match(r'CONFIG_TARGET_.*_DEVICE_.*=[ym]$', line)]
     if devices != [f'CONFIG_TARGET_airoha_an7581_DEVICE_{DEVICE}=y']:
         raise ValueError('final.config must select exactly the W1700K UBI device')
