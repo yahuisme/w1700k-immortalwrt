@@ -102,15 +102,27 @@ all:
             expected = original
             fragment = self.fragment
             run(["bash", "-e", "-c", fragment], root, env=env)
+            # Execute the production display-only customization before rendering.
+            custom = (REPO / "user/default/custom.sh").read_text()
+            display = '# Snapshot branding is display-only;' + custom.split(
+                '# Snapshot branding is display-only;', 1)[1].split('\n# ---', 1)[0]
+            templates = root / "package/base-files/files"
+            for name in self.templates:
+                path = templates / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(self.files[name])
+            run(["bash", "-e", "-c", display], root)
+            for name in self.templates:
+                (root / name).write_bytes((templates / name).read_bytes())
             rendered = self.render(root)
             self.assertEqual((root / "values").read_text().splitlines(), [expected, expected])
             self.assertEqual(run(["./scripts/getver.sh"], root, env=env).strip(), expected)
             release = rendered["etc/openwrt_release"].decode()
             os_release = rendered["usr/lib/os-release"].decode()
             self.assertIn(f"DISTRIB_REVISION='{expected}'", release)
-            self.assertIn(f"DISTRIB_DESCRIPTION='ImmortalWrt SNAPSHOT {expected}'", release)
+            self.assertIn(f"DISTRIB_DESCRIPTION='ImmortalWrt {expected}'", release)
             self.assertIn(f'BUILD_ID="{expected}"', os_release)
-            self.assertIn(f'OPENWRT_RELEASE="ImmortalWrt SNAPSHOT {expected}"', os_release)
+            self.assertIn(f'OPENWRT_RELEASE="ImmortalWrt {expected}"', os_release)
             self.assertEqual(rendered["etc/openwrt_version"], (expected + "\n").encode())
             self.assertIn(expected.encode(), rendered["etc/banner"])
             profiles = json.loads((root / "firmware/profiles.json").read_text())
@@ -126,9 +138,16 @@ all:
             self.prepare(root)
             with (root / ".config").open("a") as config:
                 config.write("# upstream snapshot version\n")
-            self.assertEqual(self.render(root), rendered)
+            baseline = self.render(root)
+            for name, value in baseline.items():
+                if name == 'etc/banner':
+                    value = value.replace(b' SNAPSHOT, ', b' ')
+                elif name in ('etc/openwrt_release', 'usr/lib/os-release'):
+                    value = value.replace(b' SNAPSHOT ' + expected.encode(), b' ' + expected.encode())
+                    value = value.replace(b' SNAPSHOT"', b' ' + expected.encode() + b'"')
+                self.assertEqual(value, rendered[name], name)
 
-    def test_standard_bytes_unchanged(self):
+    def test_standard_revision_and_metadata_unchanged(self):
         self.check_standard()
 
 
