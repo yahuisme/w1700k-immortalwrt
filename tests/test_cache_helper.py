@@ -102,17 +102,17 @@ class HelperTests(unittest.TestCase):
 
     def test_boundary_includes_margin_and_all_generations_refs(self):
         size = 1_000_000_000
-        for group, prefix in [('standard', 'cc-v3-ubi2.')]:
-            used = h.BUDGETS[group] - size - h.HEADROOM
-            for extra, expected in [(0, True), (1, False)]:
-                self.reset([entry(1, prefix+'old', used//2),
-                            entry(2, prefix+'older', used-used//2+extra, 'refs/heads/other')])
-                self.assertEqual(self.admit(size, prefix), expected)
-                self.assertFalse(self.deletes())
+        prefix = 'cc-v3-ubi2.'
+        used = h.BUDGET - size - h.HEADROOM
+        for extra, expected in [(0, True), (1, False)]:
+            self.reset([entry(1, prefix+'old', used//2),
+                        entry(2, prefix+'older', used-used//2+extra, 'refs/heads/other')])
+            self.assertEqual(self.admit(size, prefix), expected)
+            self.assertFalse(self.deletes())
 
-    def test_legacy_unknown_charged_to_each_group(self):
-        for prefix in ('cc-v3-ubi2.',):
-            cap = h.BUDGETS[h.GROUPS[prefix]]
+    def test_unknown_entries_count_for_every_cache_tier(self):
+        for prefix in h.SLOTS:
+            cap = h.BUDGET
             self.reset([entry(1, 'legacy', cap-1-h.HEADROOM)])
             self.assertTrue(self.admit(1, prefix))
             self.reset([entry(1, 'legacy', cap-h.HEADROOM)])
@@ -143,7 +143,7 @@ class HelperTests(unittest.TestCase):
 
     def test_legacy_oc_counts_against_single_budget(self):
         size = 1_000_000_000
-        self.reset([entry(1, 'tc-v3-ubi2-oc-old', h.BUDGETS['standard']-size-h.HEADROOM)])
+        self.reset([entry(1, 'tc-v3-ubi2-oc-old', h.BUDGET-size-h.HEADROOM)])
         self.assertTrue(self.admit(size))
         self.assertFalse(self.admit(size+1))
         self.assertEqual(self.deletes(), [])

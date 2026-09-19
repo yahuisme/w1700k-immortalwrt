@@ -10,7 +10,7 @@ from test_cache_workflow import render, step
 
 class RevisionLogTests(unittest.TestCase):
     def test_actual_checkout_revisions(self):
-        block = step('Prepare source and toolchain cache key')['run']
+        block = step('Prepare source and cache key')['run']
         self.assertIn('# Log actual input revisions', block)
         block = block.split('# Log actual input revisions', 1)[1].split('\n', 1)[1].split('make defconfig', 1)[0]
         paths = ['.', 'feeds/luci', 'feeds/packages',
@@ -28,7 +28,6 @@ class RevisionLogTests(unittest.TestCase):
                 git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
                     'commit', '--allow-empty', '-m', f'input {index}')
                 expected[path] = git('rev-parse', 'HEAD')
-            block = block.replace('/tmp/openw1700k', str(root / 'tmp/openw1700k'))
             block = block.replace('/tmp/yahuisme-packages', str(root / 'tmp/yahuisme-packages'))
             result = subprocess.run(['bash', '-e', '-c', render(block, {})], cwd=root,
                                     env=dict(os.environ, REPO_BRANCH='master'), capture_output=True, text=True)

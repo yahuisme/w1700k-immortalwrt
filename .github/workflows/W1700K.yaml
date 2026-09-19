@@ -42,7 +42,7 @@ jobs:
         if [ -f dlarchive/dl.tar.gz ]; then tar --gzip -xf dlarchive/dl.tar.gz -C dlcache; fi
         sudo python3 scripts/dlcache.py snapshot dlcache "$RUNNER_TEMP/dlcache-before.json"
 
-    - name: Initialize build container
+    - name: Start build container
       run: |
         [ -f "user/default/config.diff" ] || { echo "::error::config.diff not found"; exit 1; }
         rsync -aI --mkpath user/default/ user/current/ 2>&-
@@ -66,7 +66,7 @@ jobs:
         exec docker exec -u 0 -i "${e[@]}" "$@"
         DKR
 
-    - name: Prepare source and toolchain cache key
+    - name: Prepare source and cache key
       id: inputs
       run: |
         # Variables expand inside the container, not on the runner.
@@ -74,7 +74,7 @@ jobs:
         docker_exec DK bash -e -c '
           . $DK_PROFILE/settings.ini
           [[ $REPO_URL && $REPO_BRANCH ]] || { echo "::error::Missing REPO_URL or REPO_BRANCH"; exit 1; }
-          mkdir -p $DK_OPENWRT/files
+          mkdir -p $DK_OPENWRT
           cd $DK_OPENWRT
           if [ ! -d .git ]; then git init; fi
           git remote set-url origin $REPO_URL 2>&- || git remote add origin $REPO_URL
@@ -89,7 +89,6 @@ jobs:
           ./scripts/feeds install -a &>/dev/null || { echo "::error::feeds install failed"; exit 1; }
           cp $DK_PROFILE/config.diff .config
           cp -r $DK_PROFILE/files/ .
-          rm -f files/build_info  # clear build_info pre-seeded in the base-builder image
           bash $DK_PROFILE/custom.sh
           # Log actual input revisions (Git bases, not local customization).
           revision=$(git rev-parse HEAD)
@@ -133,7 +132,7 @@ jobs:
         '
 
     # Go can add dl/go-mod-cache entries during compilation, after make download.
-    - name: Detect download cache changes
+    - name: Check download cache changes
       id: dl_changed
       run: |
         # Runner owns GITHUB_OUTPUT; sudo only reads container-owned downloads.
@@ -152,12 +151,12 @@ jobs:
         echo "$VERSION" > firmware/version.txt
         RELEASE_NOTES="firmware/release-notes.md"
         cat > "$RELEASE_NOTES" <<EOF
-        ## Quantum Fiber / Gemtek W1700K ImmortalWrt — ubi2 标准版
+        ## Quantum Fiber / Gemtek W1700K ImmortalWrt — 标准版
 
-        **推荐版本。** 使用标准 CPU 工作参数，优先保障稳定性，适合绝大多数 W1700K 用户日常使用。
+        基于官方 ImmortalWrt master，使用标准 CPU 工作参数。
 
         - 机型：Quantum Fiber / Gemtek W1700K
-        - 固件分支：\`ubi2\`
+        - 固件分支：\`master\`
         - 构建时间：$(TZ=Asia/Hong_Kong date '+%Y-%m-%d %H:%M:%S %Z')
         - 固件源码：https://github.com/immortalwrt/immortalwrt
         - 本 Release 仅包含 \`sysupgrade.itb\` 升级镜像。
@@ -165,7 +164,7 @@ jobs:
         请确认设备为 W1700K，并在刷写前备份当前配置。
         EOF
 
-    - name: Publish firmware and prune old releases
+    - name: Publish firmware and prune releases
       env:
         GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       run: |

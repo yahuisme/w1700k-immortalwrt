@@ -32,7 +32,7 @@ class WorkflowTests(unittest.TestCase):
             ('stats_failure', True, 0, 0, 0, 31, 0),
             ('final_and_stats_failure', True, 0, 1, 23, 31, 23),
         ):
-            with self.subTest(case=case), tempfile.TemporaryDirectory(dir=ROOT / 'tests') as tmp:
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as tmp:
                 base = Path(tmp)
                 cc = base / 'staging_dir/host/bin/ccache'
                 cc.parent.mkdir(parents=True)
@@ -80,9 +80,9 @@ class WorkflowTests(unittest.TestCase):
 
     def test_download_gates_and_pack(self):
         snapshot = step('Extract rolling caches')
-        check = step('Detect download cache changes')
+        check = step('Check download cache changes')
 
-        self.assertLess(STEPS.index(snapshot), STEPS.index(step('Prepare source and toolchain cache key')))
+        self.assertLess(STEPS.index(snapshot), STEPS.index(step('Prepare source and cache key')))
         self.assertLess(STEPS.index(step('Compile firmware')), STEPS.index(check))
         self.assertIn('--restored', check['run'])
         admit = step('dl_budget')
@@ -114,7 +114,7 @@ class WorkflowTests(unittest.TestCase):
             self.assertIn('cache.py ccache /ghcache', result.stdout)
 
     def test_snapshot_and_post_compile_check_blocks(self):
-        with tempfile.TemporaryDirectory(dir=ROOT / 'tests') as tmp:
+        with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
             (base / 'scripts').symlink_to(ROOT / 'scripts', target_is_directory=True)
             dl = base / 'dlcache'
@@ -129,12 +129,12 @@ class WorkflowTests(unittest.TestCase):
                                         cwd=base, env=env, capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stderr)
             run('Extract rolling caches')
-            run('Detect download cache changes')
+            run('Check download cache changes')
             self.assertEqual(output.read_text(), 'save=false\n')
             module = dl / 'go-mod-cache/module.zip'
             module.parent.mkdir()
             module.write_bytes(b'added during compile')
-            run('Detect download cache changes')
+            run('Check download cache changes')
             self.assertEqual(output.read_text(), 'save=false\nsave=true\n')
 
     def test_cache_restore_contract(self):
@@ -154,7 +154,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertTrue(all(names))
         self.assertEqual(len(names), len(set(names)))
         source = step('inputs')
-        self.assertEqual(source['name'], 'Prepare source and toolchain cache key')
+        self.assertEqual(source['name'], 'Prepare source and cache key')
         self.assertLess(source['run'].index('make download'), source['run'].index('KEY=$(docker_exec'))
         self.assertEqual(STEPS.index(step('tc')), STEPS.index(source) + 1)
 

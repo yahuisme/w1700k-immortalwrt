@@ -26,14 +26,7 @@ CONFIG += ''.join(f'CONFIG_PACKAGE_{pkg}=y\n' for pkg in ('etherwake', 'ttyd', '
 
 
 class ReleaseTests(unittest.TestCase):
-    def kernel(self, base):
-        path = base / 'build_dir/target-aarch64_cortex-a53_musl/linux-airoha_an7581/linux-6.18.1/.config'
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text('CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y\n# CONFIG_TEST_SECRET is not set\n')
-        return path
-
     def fixture(self, base):
-        self.kernel(base)
         (base / 'scripts').symlink_to(ROOT / 'scripts')
         output = base / 'openwrt_bin/targets/airoha/an7581'
         output.mkdir(parents=True)
@@ -105,6 +98,10 @@ class ReleaseTests(unittest.TestCase):
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertEqual((base / 'final.config').read_text(), CONFIG)
                     self.assertEqual((base / 'firmware' / IMAGE).read_bytes(), b'fixture-not-firmware')
+                    notes = (base / 'firmware/release-notes.md').read_text()
+                    self.assertIn('固件分支：`master`', notes)
+                    self.assertIn('https://github.com/immortalwrt/immortalwrt', notes)
+                    self.assertNotIn('ubi2', notes)
                 else:
                     self.assertNotEqual(result.returncode, 0, case)
                     self.assertFalse((base / 'firmware').exists())
@@ -141,7 +138,7 @@ elif args[:2]!=['release','delete']: sys.exit(99)
                 (base / 'tags').write_text('\n'.join(standard + oc + [version, 'unrelated']))
                 env = dict(os.environ, PATH=tmp + ':' + os.environ['PATH'], STUB_ROOT=tmp, CASE=case,
                            GITHUB_SHA='a'*40, GITHUB_REPOSITORY='fixture/repo')
-                result = subprocess.run(['bash', '-eo', 'pipefail', '-c', render(step('Publish firmware and prune old releases')['run'], {})], cwd=base, env=env, text=True, capture_output=True)
+                result = subprocess.run(['bash', '-eo', 'pipefail', '-c', render(step('Publish firmware and prune releases')['run'], {})], cwd=base, env=env, text=True, capture_output=True)
                 calls = [json.loads(line) for line in (base / 'calls').read_text().splitlines()]
                 creates = [c for c in calls if c[:2] == ['release', 'create']]
                 deletes = [c[-1] for c in calls if c[:2] == ['release', 'delete']]

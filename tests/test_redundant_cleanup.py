@@ -32,13 +32,18 @@ class RedundantCleanup(unittest.TestCase):
                             path = tree / name
                             path.parent.mkdir(parents=True, exist_ok=True)
                             path.write_text('fixture')
+                        (tree / 'files').mkdir()
+                        (tree / 'files/build_info').write_text('preseeded donor metadata')
+                        (tree / '.gitignore').write_text('files/\n')
+                        subprocess.run(['git', '-C', str(tree), 'add', '.gitignore'], check=True)
                     result = subprocess.run(['bash', '-e', '-c',
                                              'mountpoint() { return 0; };\n' + script],
                                             cwd=tree, capture_output=True, text=True)
                     self.assertEqual(result.returncode, 0, result.stderr)
                     results.append(sorted(str(p.relative_to(tree)) for p in tree.rglob('*')
                                           if '.git' not in p.relative_to(tree).parts))
-            self.assertEqual(results, [['keep'], ['keep']])
+            expected = ['.gitignore', 'keep'] if populated else ['keep']
+            self.assertEqual(results, [expected, expected])
 
     def test_sysctl_load_order(self):
         # BusyBox sysctl uses /proc/sys relative to a chroot. Copy its runtime
