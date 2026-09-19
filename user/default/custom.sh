@@ -23,9 +23,11 @@ cp -r "$PKG_REPO/luci-app-wifi7" "$PKG_REPO/luci-app-airoha-npu" \
 
 # Explicit, reviewed local hardware delta; no build-time donor mirror.
 for patch in 745-net-pcs-airoha-extend-manual-rx-calib-to-E2-silicon.patch \
-             746-net-dsa-mt7530-pre-deassert-phy-reset-gpios-before-mdio-scan.patch; do
+             746-net-dsa-mt7530-pre-deassert-phy-reset-gpios-before-mdio-scan.patch \
+             940-pmdomain-airoha-cpu-pll-fallback.patch; do
     cp -f "$DK_PROFILE/patches/$patch" target/linux/airoha/patches-6.18/
 done
+patch -p1 --fuzz=0 < "$DK_PROFILE/patches/002-w1700k-cpufreq-resources.patch"
 mkdir -p package/network/utils/iwinfo/patches
 cp -f "$DK_PROFILE/patches/999-fix-txpower-list.patch" package/network/utils/iwinfo/patches/
 
