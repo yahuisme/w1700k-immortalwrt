@@ -21,21 +21,13 @@ cp -r "$PKG_REPO/luci-app-wifi7" "$PKG_REPO/luci-app-airoha-npu" \
       "$PKG_REPO/luci-app-airoha-flowsense" \
       "$PKG_REPO/luci-app-airoha-fancontrol" package/
 
-# -------------------------------------------------
-# Fetch W1700K platform patches from OpenW1700k
-# -------------------------------------------------
-FORK=/tmp/openw1700k
-if ! git clone --depth=1 --filter=blob:none --sparse --branch ubi2 \
-    https://github.com/OpenWRT-fanboy/OpenW1700k.git "$FORK"; then
-    echo "ERROR: Failed to clone OpenW1700k fork!"
-    exit 1
-fi
-git -C "$FORK" sparse-checkout set \
-    target/linux/airoha/patches-6.18 \
-    package/network/utils/iwinfo/patches \
-    target/linux/generic/pending-6.18 \
-    package/network/config/firewall4/patches \
-    target/linux/airoha/an7581/base-files/etc/hotplug.d
+# Explicit, reviewed local hardware delta; no build-time donor mirror.
+for patch in 745-net-pcs-airoha-extend-manual-rx-calib-to-E2-silicon.patch \
+             746-net-dsa-mt7530-pre-deassert-phy-reset-gpios-before-mdio-scan.patch; do
+    cp -f "$DK_PROFILE/patches/$patch" target/linux/airoha/patches-6.18/
+done
+mkdir -p package/network/utils/iwinfo/patches
+cp -f "$DK_PROFILE/patches/999-fix-txpower-list.patch" package/network/utils/iwinfo/patches/
 
 # -------------------------------------------------
 # Existing W1700K custom files
@@ -45,95 +37,16 @@ mkdir -p feeds/luci/modules/luci-mod-status/patches
 cp -f "$DK_PROFILE/patches/998-single-wiphy.patch" \
     feeds/luci/modules/luci-mod-status/patches/998-single-wiphy.patch
 
-# -------------------------------------------------
-# SPI-NAND stability: 50MHz -> 33MHz (OpenW1700k fix)
-# -------------------------------------------------
-if grep -q 'spi-max-frequency = <50000000>' target/linux/airoha/dts/an7581.dtsi 2>/dev/null; then
-    sed -i 's/spi-max-frequency = <50000000>/spi-max-frequency = <33000000>/' \
-        target/linux/airoha/dts/an7581.dtsi
-    if grep -q 'spi-max-frequency = <33000000>' target/linux/airoha/dts/an7581.dtsi; then
-        echo "spi-nand clock lowered to 33MHz"
-    else
-        echo "ERROR: spi-nand clock sed did not match; abort" >&2
-        exit 1
-    fi
-elif grep -q 'spi-max-frequency = <33000000>' target/linux/airoha/dts/an7581.dtsi 2>/dev/null; then
-    echo "spi-nand clock already 33MHz"
-else
-    echo "WARN: spi-max-frequency not found in an7581.dtsi; skip"
-fi
-
-# -------------------------------------------------
-# W1700K platform fixes from OpenW1700k (quilt-applied)
-# 745 pcs E2 calib / 746 mt7530 reset /
-# 992-20 stability / 117-03 npu timeout / 992-21 npu init stability /
-# 910-02 usb-pcie clk /
-# 939 SMCCC cpufreq / 940 CPU pmdomain (PLL fallback) /
-# 998 log silence / 994 hw gro state
-# Copied from the fork at build time to track upstream latest.
-# -------------------------------------------------
-for p in 745-net-pcs-airoha-extend-manual-rx-calib-to-E2-silicon.patch \
-         746-net-dsa-mt7530-pre-deassert-phy-reset-gpios-before-mdio-scan.patch \
-         992-20-net-airoha-stability.patch \
-         992-21-net-airoha-npu-init-stability.patch \
-         117-03-airoha_npu_eagle_add_ser.patch \
-         910-02-usb-pcie.patch \
-         939-cpufreq-airoha-Add-EN7581-CPUFreq-SMCCC-driver.patch \
-         940-pmdomain-airoha-Add-Airoha-CPU-PM-Domain-support.patch \
-         998-silence-PHY-LED-pinctrl-error.patch \
-         993-net-airoha-enable-RX_DONE-interrupt-for-RX-queue-31.patch \
-         994-net-airoha-share-hw-gro-state-across-qdma-users.patch; do
-    if [ -f "$FORK/target/linux/airoha/patches-6.18/$p" ]; then
-        cp -f "$FORK/target/linux/airoha/patches-6.18/$p" target/linux/airoha/patches-6.18/
-        echo "platform patch: $p"
-    else
-        echo "ERROR: patch not found in OpenW1700k fork: $p"
-        exit 1
-    fi
-done
-
-# -------------------------------------------------
-# mt76: ImmortalWrt official package + mirrored fork patches
-# -------------------------------------------------
-# Keep ImmortalWrt's rolling official mt76 package. The fork's
-# snapshot (01367e60) requires kernel 7.x mac80211 API and does not build
-# on the 6.18 backport, so mirror the fork's own mt76 patches on top of
-# the official package instead. They apply after the official 100 patch;
-# a failed apply aborts the build (fail-closed).
+# Only the two required firmware power-limit changes, never a broad mirror.
 mkdir -p package/kernel/mt76/patches
-mt76_patches=("$DK_PROFILE"/patches/9??-mt76-*.patch)
-if [ "${mt76_patches[0]}" = "$DK_PROFILE/patches/9??-mt76-*.patch" ]; then
-    echo "ERROR: no mt76 patches found in $DK_PROFILE/patches (9??-mt76-*.patch)"
-    exit 1
-fi
-for p in "${mt76_patches[@]}"; do
-    cp -f "$p" package/kernel/mt76/patches/
-done
-echo "mt76: official package + ${#mt76_patches[@]} mirrored fork patches"
+cp -f "$DK_PROFILE/patches/910-mt76-mt7996-enable-firmware-txpower-limit.patch" \
+    "$DK_PROFILE/patches/911-mt76-mt7996-refresh-power-limits-on-txpower-changes.patch" \
+    package/kernel/mt76/patches/
+echo "mt76: official package + two power-limit patches"
 
-# -------------------------------------------------
-# hostapd: 6G band does not require DFS (fork mtk-0015 mirror)
-# -------------------------------------------------
-cp -f "$DK_PROFILE/patches/810-hostapd-6g-band-does-not-require-dfs.patch" \
-    package/network/services/hostapd/patches/
-echo "hostapd: 6G-no-DFS patch installed"
-
-# -------------------------------------------------
-# dropbear: quiet per-connection session logs (fork mirror)
-# -------------------------------------------------
-cp -f "$DK_PROFILE/patches/500-quiet-session-logs.patch" \
-    package/network/services/dropbear/patches/
-echo "dropbear: quiet session logs patch installed"
-
-# -------------------------------------------------
-# Kernel: bridge flow offload + rtl8261ce PHY (fork mirror)
-# -------------------------------------------------
-# Bridge patches retain the official kernel's forward-path API.
-# The rolling donor uses a newer API despite sharing the kernel version.
-cp -f "$DK_PROFILE"/patches/675-0[123]-*.patch target/linux/generic/pending-6.18/
 cp -f "$DK_PROFILE/patches/999-net-phy-realtek-rtl8261ce.patch" \
     target/linux/generic/hack-6.18/
-echo "kernel: bridge flow offload + rtl8261ce PHY patches installed"
+echo "kernel: rtl8261ce PHY patch installed"
 
 # rtl8261ce driver files + fork tree files cannot reach target/linux/...
 # or package/... via the rootfs files/ overlay, so copy them into the
@@ -147,49 +60,6 @@ if [ ! -f target/linux/generic/files/drivers/net/phy/rtl8261ce/Kconfig ]; then
     exit 1
 fi
 echo "rtl8261ce: driver files injected into target/linux/generic/files"
-
-mkdir -p target/linux/airoha/base-files/etc
-cp -f "$TREE/target/linux/airoha/base-files/etc/tx-debug.sh" \
-    target/linux/airoha/base-files/etc/
-# Follow the donor's native bridge offload stack.  The old standalone
-# bridge-hw-offload package was replaced by fw4's bridge flowtable.
-mkdir -p package/network/config/firewall4/patches \
-    target/linux/airoha/an7581/base-files/etc/hotplug.d/{iface,net}
-cp -f "$FORK/package/network/config/firewall4/patches/001-add-bridge-flowtable-support.patch" \
-    package/network/config/firewall4/patches/
-
-cp -f "$FORK/target/linux/airoha/an7581/base-files/etc/hotplug.d/iface/51-bridge-hw-offload" \
-    target/linux/airoha/an7581/base-files/etc/hotplug.d/iface/
-cp -f "$FORK/target/linux/airoha/an7581/base-files/etc/hotplug.d/net/50-bridge-hw-offload" \
-    target/linux/airoha/an7581/base-files/etc/hotplug.d/net/
-
-echo "tree: airoha base-files + native bridge offload stack injected"
-
-# -------------------------------------------------
-# ramoops/pstore: crash log region (fork mirror)
-# -------------------------------------------------
-patch -p1 --ignore-whitespace < "$DK_PROFILE/patches/910-airoha-ramoops.patch"
-for cfg in CONFIG_PSTORE=y CONFIG_PSTORE_COMPRESS=y CONFIG_PSTORE_CONSOLE=y \
-           CONFIG_PSTORE_PMSG=y CONFIG_PSTORE_RAM=y; do
-    grep -qxF "$cfg" target/linux/airoha/an7581/config-6.18 \
-        || echo "$cfg" >> target/linux/airoha/an7581/config-6.18
-done
-echo "ramoops: dts node + PSTORE config enabled"
-
-# -------------------------------------------------
-# AN7581 audio: disable (no audio hardware on W1700K; fork mirror)
-# -------------------------------------------------
-if grep -q '^CONFIG_SND_SOC_AN7581=y$' target/linux/airoha/an7581/config-6.18; then
-    sed -i 's/^CONFIG_SND_SOC_AN7581=y$/# CONFIG_SND_SOC_AN7581 is not set/' \
-        target/linux/airoha/an7581/config-6.18
-    grep -q '^# CONFIG_SND_SOC_AN7581 is not set$' \
-        target/linux/airoha/an7581/config-6.18 \
-        && echo "AN7581 audio: disabled (fork mirror)" \
-        || { echo "ERROR: AN7581 audio disable failed"; exit 1; }
-else
-    echo "AN7581 audio: already disabled or absent"
-fi
-
 # -------------------------------------------------
 # rtl8261ce kmod definition (fork netdevices.mk mirror)
 # -------------------------------------------------
@@ -221,7 +91,7 @@ fi
 #   5.5G 30dBm DFS / 5.8G 5730-5895@160 30dBm (UNII-4 merged) /
 #   6G 30dBm no NO-IR. Matches the w1700k-openwrt regdb outcome
 #   (CN 2.4G/5.2G + US 5.2G already covered by official 600 patch).
-# 999 iwinfo txpower list (from the fork at build time)
+# 999 iwinfo txpower list (locally audited copy)
 # -------------------------------------------------
 mkdir -p package/firmware/wireless-regdb/patches
 mkdir -p package/network/utils/iwinfo/patches
@@ -233,91 +103,15 @@ else
     echo "ERROR: regdb patch missing: 610-w1700k-us-power-30.patch" >&2
     exit 1
 fi
-
-if [ -f "$FORK/package/network/utils/iwinfo/patches/999-fix-txpower-list.patch" ]; then
-    cp -f "$FORK/package/network/utils/iwinfo/patches/999-fix-txpower-list.patch" package/network/utils/iwinfo/patches/
-    echo "iwinfo patch: 999-fix-txpower-list.patch"
-else
-    echo "ERROR: patch not found in OpenW1700k fork: 999-fix-txpower-list.patch"
-    exit 1
-fi
-
-# -------------------------------------------------
-# OC overclock: CPU OPP to 1.4GHz (ubi2-oc profile only)
-# Triggered by performance governor in config.diff
-# -------------------------------------------------
-if grep -q '^CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y' .config 2>/dev/null; then
-    # The input symbol is only an OC trigger; defconfig strips it.
-    # Select the governor in the kernel fragment, not the top-level config.
-    KERNEL_CONFIG=target/linux/airoha/an7581/config-6.18
-    if ! grep -qx 'CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y' "$KERNEL_CONFIG" \
-        || ! grep -qx '# CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE is not set' "$KERNEL_CONFIG"; then
-        echo "ERROR: unexpected CPU governor baseline; abort" >&2
-        exit 1
-    fi
-    sed -i -e 's/^\(CONFIG_CPU_FREQ_DEFAULT_GOV_.*\)=y$/# \1 is not set/' \
-           -e 's/^# CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE is not set$/CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y/' \
-        "$KERNEL_CONFIG"
-    if [ -f "$DK_PROFILE/patches/001-oc-cpu-opp-1400mhz.patch" ]; then
-        patch -p1 --ignore-whitespace \
-            < "$DK_PROFILE/patches/001-oc-cpu-opp-1400mhz.patch"
-        # Match the OC OPP states to the fork's OC PLL fallback formula.
-        PLL_PATCH=target/linux/airoha/patches-6.18/940-pmdomain-airoha-Add-Airoha-CPU-PM-Domain-support.patch
-        if ! grep -qF 'unsigned int freq_mhz = 500 + state * 50;' "$PLL_PATCH"; then
-            echo "ERROR: unexpected PLL frequency baseline; abort" >&2
-            exit 1
-        fi
-        sed -i 's/unsigned int freq_mhz = 500 + state \* 50;/unsigned int freq_mhz = 700 + state * 50;/' "$PLL_PATCH"
-        echo "OC OPP and PLL configured (1.4GHz)"
-    else
-        echo "ERROR: OC profile but OPP patch missing; abort" >&2
-        exit 1
-    fi
-fi
-
-# -------------------------------------------------
-# LED status colors (follow OpenW1700k: boot=green, failsafe=red, running=white)
-# -------------------------------------------------
+# Preserve the user's status LED colors, not donor platform enhancements.
 DTS=target/linux/airoha/dts/an7581-w1700k-ubi.dts
-if grep -q 'led-boot = &led_status_red;' "$DTS" 2>/dev/null; then
-    sed -i -e 's/led-boot = &led_status_red;/led-boot = \&led_status_green;/' \
-           -e 's/led-failsafe = &led_status_blue;/led-failsafe = \&led_status_red;/' \
-           -e 's/led-running = &led_status_green;/led-running = \&led_status_white;/' \
-        "$DTS"
-    if grep -q 'led-boot = &led_status_green;' "$DTS" \
-        && grep -q 'led-failsafe = &led_status_red;' "$DTS" \
-        && grep -q 'led-running = &led_status_white;' "$DTS"; then
-        echo "LED status colors set (boot=green, failsafe=red, running=white)"
-    else
-        echo "ERROR: LED colors sed did not match; abort" >&2
-        exit 1
-    fi
-else
-    echo "WARN: LED aliases not found in an7581-w1700k-ubi.dts; skip"
-fi
-
-# -------------------------------------------------
-# CPUFreq: add SCU/MCUCFG register ranges to the cpufreq node
-# -------------------------------------------------
-# The Airoha CPU PM domain driver needs the chip-scu/mcucfg ranges for
-# its PLL fallback path (W1700K ATF lacks the AVS SMC handler).
-# OpenW1700k carries these regs in an7581.dtsi; add them if absent.
-DTSI=target/linux/airoha/dts/an7581.dtsi
-if grep -q 'reg-names = "chip-scu", "mcucfg"' "$DTSI" 2>/dev/null; then
-    echo "cpufreq node regs already present"
-elif grep -q '^[[:space:]]*cpufreq: cpufreq {' "$DTSI" 2>/dev/null; then
-    sed -i '/^[[:space:]]*cpufreq: cpufreq {$/a\
-\t\treg = <0x0 0x1fa20000 0x0 0x2c0>, <0x0 0x1efbe000 0x0 0x800>;\
-\t\treg-names = "chip-scu", "mcucfg";' "$DTSI"
-    if grep -q 'reg-names = "chip-scu", "mcucfg"' "$DTSI"; then
-        echo "cpufreq node regs added (chip-scu/mcucfg)"
-    else
-        echo "ERROR: cpufreq regs injection failed; abort" >&2
-        exit 1
-    fi
-else
-    echo "WARN: cpufreq node not found in an7581.dtsi; skip"
-fi
+sed -i -e 's/led-boot = &led_status_red;/led-boot = \&led_status_green;/' \
+       -e 's/led-failsafe = &led_status_blue;/led-failsafe = \&led_status_red;/' \
+       -e 's/led-running = &led_status_green;/led-running = \&led_status_white;/' "$DTS"
+for alias in 'boot green' 'failsafe red' 'running white'; do
+    read -r state color <<< "$alias"
+    grep -q "led-$state = &led_status_$color;" "$DTS" || { echo "ERROR: LED alias mismatch: $state" >&2; exit 1; }
+done
 
 # -------------------------------------------------
 # Install latest Aurora LuCI theme

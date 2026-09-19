@@ -15,9 +15,9 @@
 - 📦 内置定制专属全中文汉化应用
 - 🌡️ LuCI 首页增加温度及风扇转速显示
 - 🚀 集成 NPU 硬件加速
-- ⚡ 底层网络优化
-- 🛡️ 纯净系统 + 集成最新优化补丁
-- 📡 WiFi 稳定性修复 + 解除功率限制
+- ⚡ 使用官方网络栈与标准硬件卸载
+- 🛡️ 官方 master snapshot + 明确保留的最小硬件补丁
+- 📡 保留 30 dBm 功率配置支持（实际发射受硬件及法规约束）
 
 ---
 
@@ -27,7 +27,7 @@
 
 | 插件 | 功能说明 |
 | :--- | :--- |
-| [`luci-app-airoha-npu`](https://github.com/yahuisme/packages/tree/main/luci-app-airoha-npu) | Airoha NPU 状态监控与 SoC 频率控制 |
+| [`luci-app-airoha-npu`](https://github.com/yahuisme/packages/tree/main/luci-app-airoha-npu) | Airoha NPU 状态监控与 SoC 管理（频率控制取决于驱动支持） |
 | [`luci-app-airoha-fancontrol`](https://github.com/yahuisme/packages/tree/main/luci-app-airoha-fancontrol) | 动态温控曲线与四线 PWM 风扇调速 |
 | [`luci-app-airoha-flowsense`](https://github.com/yahuisme/packages/tree/main/luci-app-airoha-flowsense) | PPE 硬件流控与加速状态实时监控 |
 | [`luci-app-wifi7`](https://github.com/yahuisme/packages/tree/main/luci-app-wifi7) | Wi-Fi 7 射频、MLO 与运行状态管理 |
@@ -41,8 +41,7 @@
 
 | 固件 | 说明 |
 | --- | --- |
-| `ubi2` | 常规版本，使用标准 CPU 工作参数 |
-| `ubi2-oc` | 超频版本，默认性能模式并超频 +200 MHz |
+| 官方 snapshot 标准版 | 现行 W1700K UBI 布局，标准 CPU 参数；仅发布 sysupgrade.itb |
 
 ---
 
@@ -79,3 +78,7 @@ LuCI 状态首页显示 CPU、主板、10G WAN/LAN PHY、2.4/5/6 GHz WiFi 温度
 ## 🔄 自动构建
 
 每日自动构建。
+
+仅构建标准版，不引入外部 fork 的桥接 flowtable、GRO、NPU 或 CPUFreq 扩展。
+必要补丁及来源见 [patches/README.md](user/default/patches/README.md)。
+专属应用保留；缺少 CPUFreq/Devfreq 接口时，频率菜单和表单自动隐藏。官方标准卸载不包含 fork 专有桥接加速。

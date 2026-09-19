@@ -16,7 +16,7 @@ class CustomProfile(unittest.TestCase):
         for package in ('kmod-crypto-hw-eip93', 'kmod-phy-rtl8261ce'):
             self.assertIn(f'CONFIG_PACKAGE_{package}=y', config)
         self.assertNotIn('CONFIG_PACKAGE_bridge-hw-offload=y', config)
-        self.assertIn('001-add-bridge-flowtable-support.patch', CUSTOM)
+        self.assertNotIn('001-add-bridge-flowtable-support.patch', CUSTOM)
         self.assertNotIn('920-bridge-hw-offload-lifecycle.patch', CUSTOM)
         self.assertIn('define KernelPackage/phy-rtl8261ce', CUSTOM)
         self.assertIn('999-net-phy-realtek-rtl8261ce.patch', CUSTOM)

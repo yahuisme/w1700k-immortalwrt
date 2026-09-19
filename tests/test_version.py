@@ -89,7 +89,7 @@ all:
         run(["make", "--no-print-directory"], root)
         return {name: (root / name).read_bytes() for name in self.templates}
 
-    def check_variant(self, variant, cached=False):
+    def check_standard(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self.prepare(root)
@@ -99,64 +99,37 @@ all:
             match = re.fullmatch(r"r([0-9]+)(-[0-9a-f]+)", original)
             assert match is not None, original
             self.assertTrue(self.sha.startswith(match[2][1:]), (self.sha, original))
-            expected = f"r{int(match[1]) + (variant == 'ubi2-oc')}{match[2]}"
-            if cached:
-                (root / "version").write_text("r1-deadbeef\n")
-            fragment = self.fragment.replace("${{ matrix.target }}", variant)
+            expected = original
+            fragment = self.fragment
             run(["bash", "-e", "-c", fragment], root, env=env)
             rendered = self.render(root)
             self.assertEqual((root / "values").read_text().splitlines(), [expected, expected])
             self.assertEqual(run(["./scripts/getver.sh"], root, env=env).strip(), expected)
-            if variant == "ubi2-oc":
-                self.assertEqual((root / "version").read_text(), expected + "\n")
-                # A repeat prepare must derive from git, not increment yesterday's cache.
-                run(["bash", "-e", "-c", fragment], root, env=env)
-                self.assertEqual(run(["./scripts/getver.sh"], root, env=env).strip(), expected)
             release = rendered["etc/openwrt_release"].decode()
             os_release = rendered["usr/lib/os-release"].decode()
             self.assertIn(f"DISTRIB_REVISION='{expected}'", release)
-            self.assertIn(f"DISTRIB_DESCRIPTION='ImmortalWrt {variant} {expected}'", release)
+            self.assertIn(f"DISTRIB_DESCRIPTION='ImmortalWrt SNAPSHOT {expected}'", release)
             self.assertIn(f'BUILD_ID="{expected}"', os_release)
-            self.assertIn(f'OPENWRT_RELEASE="ImmortalWrt {variant} {expected}"', os_release)
+            self.assertIn(f'OPENWRT_RELEASE="ImmortalWrt SNAPSHOT {expected}"', os_release)
             self.assertEqual(rendered["etc/openwrt_version"], (expected + "\n").encode())
             self.assertIn(expected.encode(), rendered["etc/banner"])
             profiles = json.loads((root / "firmware/profiles.json").read_text())
             self.assertEqual(profiles["version_code"], expected)
-            self.assertEqual(profiles["version_number"], variant)
-            run(["bash", "-e", "-c", self.tag.replace("${{ matrix.target }}", variant)], root, env=env)
-            prefix = "W1700K-ImmortalWrt" + ("-OC" if variant == "ubi2-oc" else "")
+            self.assertEqual(profiles["version_number"], "SNAPSHOT")
+            run(["bash", "-e", "-c", self.tag], root, env=env)
+            prefix = "W1700K-ImmortalWrt"
             self.assertTrue((root / "firmware/version.txt").read_text().startswith(
                 prefix + "-" + expected.split("-")[0] + "-"))
             self.assertEqual(run(["git", "rev-parse", "HEAD"], root).strip(), self.sha)
-            if variant == "ubi2":
-                self.assertFalse((root / "version").exists())
-                # Baseline is upstream rendering with the original workflow's standard config.
-                self.prepare(root)
-                with (root / ".config").open("a") as config:
-                    config.write("CONFIG_VERSION_NUMBER=ubi2\n")
-                self.assertEqual(self.render(root), rendered)
-
-    def test_oc_all_version_consumers(self):
-        self.check_variant("ubi2-oc")
-
-    def test_oc_ignores_stale_version_cache(self):
-        self.check_variant("ubi2-oc", cached=True)
+            self.assertFalse((root / "version").exists())
+            # Baseline is upstream rendering with the original workflow's standard config.
+            self.prepare(root)
+            with (root / ".config").open("a") as config:
+                config.write("# upstream snapshot version\n")
+            self.assertEqual(self.render(root), rendered)
 
     def test_standard_bytes_unchanged(self):
-        self.check_variant("ubi2")
-
-    def test_oc_rejects_unknown_revision(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            self.prepare(root)
-            (root / ".git").unlink()
-            result = subprocess.run(
-                ["bash", "-e", "-c", self.fragment.replace("${{ matrix.target }}", "ubi2-oc")],
-                cwd=root, text=True, capture_output=True,
-            )
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("Unexpected revision: unknown", result.stdout)
-            self.assertFalse((root / "version").exists())
+        self.check_standard()
 
 
 if __name__ == "__main__":

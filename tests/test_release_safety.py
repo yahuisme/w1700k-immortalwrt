@@ -18,18 +18,22 @@ CONFIG_TARGET_airoha_an7581_DEVICE_gemtek_w1700k-ubi=y
 CONFIG_TARGET_BOARD="airoha"
 CONFIG_TARGET_SUBTARGET="an7581"
 '''
+for app in ('airoha-fancontrol', 'airoha-flowsense', 'airoha-npu', 'wifi7', 'wol', 'ttyd', 'usteer'):
+    CONFIG += f'CONFIG_PACKAGE_luci-app-{app}=y\nCONFIG_PACKAGE_luci-i18n-{app}-zh-cn=y\n'
+
+
+CONFIG += ''.join(f'CONFIG_PACKAGE_{pkg}=y\n' for pkg in ('etherwake', 'ttyd', 'usteer', 'wpad-openssl'))
 
 
 class ReleaseTests(unittest.TestCase):
-    def kernel(self, base, target='ubi2'):
+    def kernel(self, base):
         path = base / 'build_dir/target-aarch64_cortex-a53_musl/linux-airoha_an7581/linux-6.18.1/.config'
         path.parent.mkdir(parents=True, exist_ok=True)
-        governor = 'PERFORMANCE' if target == 'ubi2-oc' else 'ONDEMAND'
-        path.write_text(f'CONFIG_CPU_FREQ_DEFAULT_GOV_{governor}=y\n# CONFIG_TEST_SECRET is not set\n')
+        path.write_text('CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y\n# CONFIG_TEST_SECRET is not set\n')
         return path
 
-    def fixture(self, base, target='ubi2'):
-        self.kernel(base, target)
+    def fixture(self, base):
+        self.kernel(base)
         (base / 'scripts').symlink_to(ROOT / 'scripts')
         output = base / 'openwrt_bin/targets/airoha/an7581'
         output.mkdir(parents=True)
@@ -42,19 +46,33 @@ class ReleaseTests(unittest.TestCase):
         (output / 'profiles.json').write_text(json.dumps(data))
         return output, data
 
-    def stage(self, base, target='ubi2'):
-        block = 'sudo() { "$@"; }; docker_exec() { shift; "$@"; };\n' + render(step('Validate and stage firmware')['run'], {'matrix.target': target})
+    def stage(self, base):
+        block = 'sudo() { "$@"; }; docker_exec() { shift; "$@"; };\n' + render(step('Validate and stage firmware')['run'], {})
         return subprocess.run(['bash', '-eo', 'pipefail', '-c', block], cwd=base,
                               env=dict(os.environ, DK_OPENWRT=str(base)), text=True, capture_output=True)
 
+    def test_required_user_packages_cannot_be_omitted(self):
+        packages = ['etherwake', 'ttyd', 'usteer', 'wpad-openssl']
+        packages += [pkg for app in ('wol', 'ttyd', 'usteer')
+                     for pkg in ('luci-app-' + app, 'luci-i18n-' + app + '-zh-cn')]
+        for package in packages:
+            with self.subTest(package=package), tempfile.TemporaryDirectory() as tmp:
+                base = Path(tmp)
+                output, data = self.fixture(base)
+                (output / 'profiles.json').write_text(json.dumps(data))
+                (base / '.config').write_text(CONFIG.replace(f'CONFIG_PACKAGE_{package}=y\n', ''))
+                result = self.stage(base)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(package, result.stderr)
+
     def test_stage_contract(self):
-        for case in ('valid', 'oc', 'wrong-config', 'two-devices', 'missing-config', 'missing-target',
+        for case in ('valid', 'wrong-config', 'two-devices', 'missing-config', 'missing-target',
                      'wrong-json', 'two-profiles', 'wrong-supported', 'wrong-title', 'wrong-name',
                      'two-images', 'empty', 'missing-image', 'missing-json', 'bad-json', 'size', 'metadata-duplicate',
                      'metadata-name', 'filesystem', 'revision', 'other-target'):
             with self.subTest(case=case), tempfile.TemporaryDirectory() as tmp:
                 base = Path(tmp)
-                out, data = self.fixture(base, 'ubi2-oc' if case == 'oc' else 'ubi2')
+                out, data = self.fixture(base)
                 profile = data['profiles']['gemtek_w1700k-ubi']
                 config = base / '.config'
                 image = out / IMAGE
@@ -82,8 +100,8 @@ class ReleaseTests(unittest.TestCase):
                 (out / 'profiles.json').write_text(json.dumps(data))
                 if case == 'missing-json': (out / 'profiles.json').unlink()
                 if case == 'bad-json': (out / 'profiles.json').write_text('{')
-                result = self.stage(base, 'ubi2-oc' if case == 'oc' else 'ubi2')
-                if case in ('valid', 'oc'):
+                result = self.stage(base)
+                if case == 'valid':
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertEqual((base / 'final.config').read_text(), CONFIG)
                     self.assertEqual((base / 'firmware' / IMAGE).read_bytes(), b'fixture-not-firmware')
@@ -91,58 +109,15 @@ class ReleaseTests(unittest.TestCase):
                     self.assertNotEqual(result.returncode, 0, case)
                     self.assertFalse((base / 'firmware').exists())
 
-    def test_final_kernel_governor_gate(self):
-        for target in ('ubi2', 'ubi2-oc'):
-            for case in ('valid', 'headers-ignored', 'missing', 'headers-only',
-                         'headers-nested', 'target-headers-only', 'wrong-target', 'multiple', 'wrong',
-                         'opposite', 'duplicate', 'two-defaults', 'empty', 'unset'):
-                with self.subTest(target=target, case=case), tempfile.TemporaryDirectory() as tmp:
-                    base = Path(tmp)
-                    self.fixture(base, target)
-                    kernel = self.kernel(base, target)
-                    expected = 'PERFORMANCE' if target == 'ubi2-oc' else 'ONDEMAND'
-                    good = kernel.read_text()
-                    if case in ('missing', 'headers-only', 'headers-nested', 'target-headers-only', 'wrong-target'):
-                        kernel.unlink()
-                    if case in ('headers-only', 'headers-ignored', 'headers-nested', 'target-headers-only', 'wrong-target', 'multiple'):
-                        locations = {
-                            'target-headers-only': 'target-aarch64_cortex-a53_musl/linux-airoha_an7581/linux-headers/.config',
-                            'headers-only': 'toolchain-aarch64/linux-6.18.1/.config',
-                            'headers-ignored': 'target-aarch64_cortex-a53_musl/linux-airoha_an7581/linux-headers/.config',
-                            'headers-nested': 'target-aarch64_cortex-a53_musl/linux-airoha_an7581/linux-headers/linux-6.18.1/.config',
-                            'wrong-target': 'target-aarch64_cortex-a53_musl/linux-mediatek_filogic/linux-6.18.1/.config',
-                            'multiple': 'target-aarch64_cortex-a53_musl/linux-airoha_an7581/linux-6.18.2/.config',
-                        }
-                        extra = base / 'build_dir' / locations[case]
-                        extra.parent.mkdir(parents=True, exist_ok=True)
-                        extra.write_text(good)
-                    if case == 'opposite':
-                        other = 'ONDEMAND' if expected == 'PERFORMANCE' else 'PERFORMANCE'
-                        kernel.write_text(f'CONFIG_CPU_FREQ_DEFAULT_GOV_{other}=y\n')
-                    if case == 'duplicate': kernel.write_text(good + good)
-                    if case == 'wrong': kernel.write_text('CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=y\n')
-                    if case == 'two-defaults': kernel.write_text(good + 'CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=y\n')
-                    if case == 'empty': kernel.write_text('')
-                    if case == 'unset': kernel.write_text(f'# CONFIG_CPU_FREQ_DEFAULT_GOV_{expected} is not set\n')
-                    result = self.stage(base, target)
-                    if case in ('valid', 'headers-ignored'):
-                        self.assertEqual(result.returncode, 0, result.stderr)
-                        self.assertIn(f'Verified kernel governor: CONFIG_CPU_FREQ_DEFAULT_GOV_{expected}=y', result.stdout)
-                        self.assertNotIn('CONFIG_TEST_SECRET', result.stdout)
-                    else:
-                        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-                        self.assertFalse((base / 'firmware').exists())
-
-    def test_publish_freshness_and_matrix_isolation(self):
-        for target in ('ubi2', 'ubi2-oc'):
-            for case in ('fresh', 'stale', 'error', 'empty', 'malformed', 'advance', 'recheck-error', 'create-error'):
-                with self.subTest(target=target, case=case), tempfile.TemporaryDirectory() as tmp:
-                    base = Path(tmp)
-                    self.fixture(base, target)
-                    result = self.stage(base, target)
-                    self.assertEqual(result.returncode, 0, result.stderr)
-                    gh = base / 'gh'
-                    gh.write_text('''#!/usr/bin/env python3
+    def test_publish_freshness_and_retired_oc_release_retention(self):
+        for case in ('fresh', 'stale', 'error', 'empty', 'malformed', 'advance', 'recheck-error', 'create-error'):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as tmp:
+                base = Path(tmp)
+                self.fixture(base)
+                result = self.stage(base)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                gh = base / 'gh'
+                gh.write_text('''#!/usr/bin/env python3
 import os,json,sys
 from pathlib import Path
 args=sys.argv[1:]; root=Path(os.environ['STUB_ROOT']); mode=os.environ['CASE']
@@ -159,28 +134,28 @@ elif args[:2]==['release','list']:
     print((root/'tags').read_text())
 elif args[:2]!=['release','delete']: sys.exit(99)
 ''')
-                    gh.chmod(0o755)
-                    version = (base / 'firmware/version.txt').read_text().strip()
-                    standard = ['W1700K-ImmortalWrt_old', 'W1700K-ImmortalWrt-r1-old', 'W1700K-ubi2_old']
-                    oc = ['W1700K-ImmortalWrt-OC_old', 'W1700K-ImmortalWrt-OC-r1-old', 'W1700K-ubi2-oc_old']
-                    (base / 'tags').write_text('\n'.join(standard + oc + [version, 'unrelated']))
-                    env = dict(os.environ, PATH=tmp + ':' + os.environ['PATH'], STUB_ROOT=tmp, CASE=case,
-                               GITHUB_SHA='a'*40, GITHUB_REPOSITORY='fixture/repo')
-                    result = subprocess.run(['bash', '-eo', 'pipefail', '-c', render(step('Publish firmware and prune old releases')['run'], {'matrix.target': target})], cwd=base, env=env, text=True, capture_output=True)
-                    calls = [json.loads(line) for line in (base / 'calls').read_text().splitlines()]
-                    creates = [c for c in calls if c[:2] == ['release', 'create']]
-                    deletes = [c[-1] for c in calls if c[:2] == ['release', 'delete']]
-                    self.assertEqual(result.returncode == 0, case in ('fresh', 'stale', 'advance'), result.stderr)
-                    self.assertEqual(bool(creates), case in ('fresh', 'advance', 'recheck-error', 'create-error'))
-                    if creates: self.assertEqual(creates[0][creates[0].index('--target') + 1], 'a'*40)
-                    self.assertEqual(set(deletes), set(standard if target == 'ubi2' else oc) if case == 'fresh' else set())
-                    self.assertEqual(calls[0], ['api', 'repos/fixture/repo/git/ref/heads/main', '--jq', '.object.sha'])
-                    if case == 'stale':
-                        # A successful skipped publication leaves ordinary cache steps runnable.
-                        block = 'docker_exec() { printf "%s\\n" "$*"; }; sudo() { :; };\n' + render(step('Package build caches')['run'], {'matrix.target': target, 'steps.tc.outputs.cache-hit': 'true'})
-                        packed = subprocess.run(['bash', '-e', '-c', block], cwd=base, env=env, capture_output=True, text=True)
-                        self.assertEqual(packed.returncode, 0)
-                        self.assertIn('cache.py ccache', packed.stdout)
+                gh.chmod(0o755)
+                version = (base / 'firmware/version.txt').read_text().strip()
+                standard = ['W1700K-ImmortalWrt_old', 'W1700K-ImmortalWrt-r1-old', 'W1700K-ubi2_old']
+                oc = ['W1700K-ImmortalWrt-OC_old', 'W1700K-ImmortalWrt-OC-r1-old', 'W1700K-ubi2-oc_old']
+                (base / 'tags').write_text('\n'.join(standard + oc + [version, 'unrelated']))
+                env = dict(os.environ, PATH=tmp + ':' + os.environ['PATH'], STUB_ROOT=tmp, CASE=case,
+                           GITHUB_SHA='a'*40, GITHUB_REPOSITORY='fixture/repo')
+                result = subprocess.run(['bash', '-eo', 'pipefail', '-c', render(step('Publish firmware and prune old releases')['run'], {})], cwd=base, env=env, text=True, capture_output=True)
+                calls = [json.loads(line) for line in (base / 'calls').read_text().splitlines()]
+                creates = [c for c in calls if c[:2] == ['release', 'create']]
+                deletes = [c[-1] for c in calls if c[:2] == ['release', 'delete']]
+                self.assertEqual(result.returncode == 0, case in ('fresh', 'stale', 'advance'), result.stderr)
+                self.assertEqual(bool(creates), case in ('fresh', 'advance', 'recheck-error', 'create-error'))
+                if creates: self.assertEqual(creates[0][creates[0].index('--target') + 1], 'a'*40)
+                self.assertEqual(set(deletes), set(standard) if case == 'fresh' else set())
+                self.assertEqual(calls[0], ['api', 'repos/fixture/repo/git/ref/heads/main', '--jq', '.object.sha'])
+                if case == 'stale':
+                    # A successful skipped publication leaves ordinary cache steps runnable.
+                    block = 'docker_exec() { printf "%s\\n" "$*"; }; sudo() { :; };\n' + render(step('Package build caches')['run'], {'steps.tc.outputs.cache-hit': 'true'})
+                    packed = subprocess.run(['bash', '-e', '-c', block], cwd=base, env=env, capture_output=True, text=True)
+                    self.assertEqual(packed.returncode, 0)
+                    self.assertIn('cache.py ccache', packed.stdout)
 
 
 class LegacyRemovalTests(unittest.TestCase):

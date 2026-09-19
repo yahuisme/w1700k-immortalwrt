@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class RedundantCleanup(unittest.TestCase):
     def test_build_tree_cleanup(self):
         workflow = (ROOT / '.github/workflows/W1700K.yaml').read_text()
-        start = workflow.index('          mountpoint $DK_BIN')
+        start = workflow.index('          git clean -ffdx')
         end = workflow.index('          ln -s $DK_BIN', start)
         current = workflow[start:end]
         previous = ('rm -f build_dir/target-*/linux-*/.prepared* '
@@ -22,6 +22,8 @@ class RedundantCleanup(unittest.TestCase):
                 with tempfile.TemporaryDirectory() as tmp:
                     tree = Path(tmp)
                     (tree / 'keep').write_text('preserved')
+                    subprocess.run(['git', 'init', '-q', str(tree)], check=True)
+                    subprocess.run(['git', '-C', str(tree), 'add', 'keep'], check=True)
                     if populated:
                         for name in ('build_dir/target-a/linux-a/.prepared_1',
                                      'build_dir/target-b/linux-b/.config',
@@ -34,7 +36,8 @@ class RedundantCleanup(unittest.TestCase):
                                              'mountpoint() { return 0; };\n' + script],
                                             cwd=tree, capture_output=True, text=True)
                     self.assertEqual(result.returncode, 0, result.stderr)
-                    results.append(sorted(str(p.relative_to(tree)) for p in tree.rglob('*')))
+                    results.append(sorted(str(p.relative_to(tree)) for p in tree.rglob('*')
+                                          if '.git' not in p.relative_to(tree).parts))
             self.assertEqual(results, [['keep'], ['keep']])
 
     def test_sysctl_load_order(self):

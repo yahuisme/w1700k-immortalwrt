@@ -102,7 +102,7 @@ class HelperTests(unittest.TestCase):
 
     def test_boundary_includes_margin_and_all_generations_refs(self):
         size = 1_000_000_000
-        for group, prefix in [('standard', 'cc-v3-ubi2.'), ('oc', 'cc-v3-ubi2-oc.')]:
+        for group, prefix in [('standard', 'cc-v3-ubi2.')]:
             used = h.BUDGETS[group] - size - h.HEADROOM
             for extra, expected in [(0, True), (1, False)]:
                 self.reset([entry(1, prefix+'old', used//2),
@@ -111,7 +111,7 @@ class HelperTests(unittest.TestCase):
                 self.assertFalse(self.deletes())
 
     def test_legacy_unknown_charged_to_each_group(self):
-        for prefix in ('cc-v3-ubi2.', 'cc-v3-ubi2-oc.'):
+        for prefix in ('cc-v3-ubi2.',):
             cap = h.BUDGETS[h.GROUPS[prefix]]
             self.reset([entry(1, 'legacy', cap-1-h.HEADROOM)])
             self.assertTrue(self.admit(1, prefix))
@@ -141,21 +141,15 @@ class HelperTests(unittest.TestCase):
             entries.append(entry(len(entries)+1, prefix+'new', size+h.HEADROOM))
         self.assertLessEqual(sum(e['size_in_bytes'] for e in entries), 10_000_000_000)
 
-    def test_parallel_groups_cannot_spend_peer_headroom(self):
-        # Both admit from the SAME snapshot at their exact respective caps.
+    def test_legacy_oc_counts_against_single_budget(self):
         size = 1_000_000_000
-        entries = [entry(1, 'cc-v3-ubi2.old', 6_000_000_000-size-h.HEADROOM),
-                   entry(2, 'cc-v3-ubi2-oc.old', 4_000_000_000-size-h.HEADROOM)]
-        for prefix in ('cc-v3-ubi2.', 'cc-v3-ubi2-oc.'):
-            self.reset(entries)
-            self.assertTrue(self.admit(size, prefix))
-            self.assertFalse(self.admit(size+1, prefix))
-        self.assertEqual(sum(e['size_in_bytes'] for e in entries)+2*(size+h.HEADROOM), 10_000_000_000)
-        self.reset([entry(1, 'cc-v3-ubi2.old', 6_000_000_000)])
-        self.assertFalse(self.admit(1))  # total repository still has 4 GB free
+        self.reset([entry(1, 'tc-v3-ubi2-oc-old', h.BUDGETS['standard']-size-h.HEADROOM)])
+        self.assertTrue(self.admit(size))
+        self.assertFalse(self.admit(size+1))
+        self.assertEqual(self.deletes(), [])
 
     def test_paginated_inventory_and_admission_read_failure(self):
-        self.reset([entry(i, 'legacy'+str(i), 2_000_000_000) for i in range(1, 4)])
+        self.reset([entry(i, 'legacy'+str(i), 2_000_000_000) for i in range(1, 6)])
         self.assertFalse(self.admit(1))  # third entry on page two matters
         self.reset([], fail_reads=[1])
         self.assertFalse(self.admit(1))
@@ -196,7 +190,7 @@ class HelperTests(unittest.TestCase):
 
     def test_visibility_retry_is_bounded_and_fails_closed(self):
         from unittest.mock import patch
-        prefix, keep = 'cc-v3-ubi2-oc.', 'cc-v3-ubi2-oc.new'
+        prefix, keep = 'cc-v3-ubi2.', 'cc-v3-ubi2.new'
         old = entry(2, prefix + 'old')
         for pending in ([old], [entry(1, keep, size=0), old],
                         [entry(1, keep, ref='refs/heads/other'), old]):
@@ -223,7 +217,7 @@ class HelperTests(unittest.TestCase):
         self.assertEqual({e['id'] for e in self.snapshot()['entries']}, {1, 3, 4, 6, 7, 8})
         self.assertEqual(self.snapshot()['reads'], 2)
         self.reset(self.caches())
-        self.assertIn('cleanup verified', self.cleanup('tc-v3-ubi2-oc-peer', 'tc-v3-ubi2-oc-'))
+        self.assertIn('cleanup unverified', self.cleanup('tc-v3-ubi2-oc-peer', 'tc-v3-ubi2-oc-'))
         self.assertFalse(self.deletes())
 
     def test_missing_zero_wrong_ref_or_owner_new_key_never_deletes(self):

@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 """Read-only admission; delete old generations only after a verified save.
 
-The sequential standard writer owns 6 GB; the sequential OC writer owns 4 GB.
-Each counts ALL generations/refs in its group, plus unknown/legacy bytes, its
-candidate and packaging headroom INSIDE its cap. Thus concurrent groups cannot
-spend each other's free capacity. Workflow concurrency excludes overlapping
-runs; external writers are outside this protocol. Inventory must be readable.
+The standard writer owns the 10 GB repository budget, including unknown and
+legacy caches. Admission is read-only; save/readback precedes cleanup.
 """
 import json
 import os
@@ -14,11 +11,10 @@ import subprocess
 import sys
 import time
 
-SLOTS = {'tc-v3-ubi2-': 2_000_000_000, 'tc-v3-ubi2-oc-': 2_000_000_000,
-         'cc-v3-ubi2.': 1_500_000_000, 'cc-v3-ubi2-oc.': 1_500_000_000,
+SLOTS = {'tc-v3-ubi2-': 2_000_000_000, 'cc-v3-ubi2.': 1_500_000_000,
          'dl-v3.': 2_200_000_000}
-GROUPS = {p: ('oc' if 'ubi2-oc' in p else 'standard') for p in SLOTS}
-BUDGETS = {'standard': 6_000_000_000, 'oc': 4_000_000_000}
+GROUPS = {p: 'standard' for p in SLOTS}
+BUDGETS = {'standard': 10_000_000_000}
 HEADROOM = 64 * 1024 * 1024
 
 
@@ -40,6 +36,9 @@ def inv():
 
 
 def owner(key):
+    # Legacy OC keys share the standard tc prefix; count, never adopt/delete.
+    if key.startswith(('tc-v3-ubi2-oc-', 'cc-v3-ubi2-oc.')):
+        return None
     return next((p for p in sorted(SLOTS, key=len, reverse=True)
                  if key.startswith(p)), None)
 
