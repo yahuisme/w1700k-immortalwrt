@@ -3,7 +3,29 @@
 ## Contract
 
 The key hashes the complete final `.config`, source contents and modes under
-`INPUTS`, builder image ID, host architecture, build path and fingerprint policy.
+`INPUTS`, builder fingerprint, host architecture, build path and fingerprint policy.
+`tc-inputs-v7` replaces image-ID compatibility; the workflow still inspects and
+runs the exact local `IMAGE_ID`, but never hashes OCI creation timestamps.
+
+`scripts/builder_fingerprint.py` runs inside that container before source prep.
+Policy `builder-v1` hashes the names and per-file SHA256 of actual recipe inputs
+(currently **only Dockerfile**, because it has no COPY/ADD), the SHA256 of its own
+implementation, `platform.machine()`, and the complete sorted `dpkg-query`
+package/architecture/version inventory. Empty or failing inventory, a missing
+Dockerfile or a symlinked Dockerfile is rejected. The pinned official Debian base
+and official Go archive checksum are covered by Dockerfile bytes. Adding COPY/ADD
+requires extending the explicit input list and reviewing this contract.
+
+README, smoke script and .dockerignore edits do not invalidate the toolchain key:
+none currently contributes bytes to the built environment. File mtimes, inventory
+order, image IDs and container IDs also do not invalidate it. Rolling apt package
+updates do. This controlled-recipe contract is not arbitrary-image equivalence
+or a claim of bit-reproducible apt/image contents. Do not introduce mutable
+non-dpkg downloads, build-arg overrides or ad-hoc container mutations without
+verified identities in this contract. Implementation changes invalidate identity.
+
+Only toolchain restore is exact (no prefix fallback). Existing compiler/download
+cache prefixes, sizes, repository admission budget and scheduling are unchanged.
 There is no CONFIG projection, audited-source lock or historical commit dependency.
 This policy change deliberately starts a new exact-key generation; no old-key
 fallback is allowed. Package/version settings and literal DEFAULT_PACKAGES changes
@@ -20,6 +42,9 @@ are never touched. PAX archives preserve nanoseconds and restore matching
 
 ```sh
 python3 -m unittest discover -s tests -p 'test_cache_key.py' -v
+python3 -m unittest discover -s tests -p 'test_builder_image.py' -v
+# No compilation: default process, mounts, Go/tool availability and cache primitives
+# Run docker/smoke.sh in an empty-source builder, not a prepared buildroot.
 # Disposable, configured Airoha/an7581 source with native host build prerequisites:
 python3 tests/check_cache_upstream.py "$PREPARED_BUILDROOT"
 ```

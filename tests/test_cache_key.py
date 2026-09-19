@@ -35,7 +35,7 @@ class KeyTests(unittest.TestCase):
         return p
 
     def key(self):
-        return self.cache.key(self.root, 'image-sha')
+        return self.cache.key(self.root, 'builder-fingerprint')
 
     def test_runtime_overlay_add_edit_rename_delete_and_symlink(self):
         before = self.key()
@@ -83,9 +83,9 @@ class KeyTests(unittest.TestCase):
         alternate = Path(self.tmp.name) / 'alternate.py'
         alternate.write_text(SCRIPT.read_text().replace('def pack(root, cache, kind, expected):',
                             'def pack(root, cache, kind, expected):\n    # unrelated upload edit'))
-        self.assertEqual(before, load(alternate).key(self.root, 'image-sha'))
-        alternate.write_text(SCRIPT.read_text().replace('tc-inputs-v6', 'tc-inputs-test'))
-        self.assertNotEqual(before, load(alternate).key(self.root, 'image-sha'))
+        self.assertEqual(before, load(alternate).key(self.root, 'builder-fingerprint'))
+        alternate.write_text(SCRIPT.read_text().replace('tc-inputs-v7', 'tc-inputs-test'))
+        self.assertNotEqual(before, load(alternate).key(self.root, 'builder-fingerprint'))
 
     def test_entire_config_always_participates(self):
         original = 'CONFIG_PACKAGE_runtime=y\nCONFIG_VERSION_NUMBER="one"\n'
@@ -145,7 +145,7 @@ class KeyTests(unittest.TestCase):
         self.assertEqual(before, self.key())
         p.chmod(p.stat().st_mode ^ 0o100)
         self.assertNotEqual(before, self.key())
-        self.assertNotEqual(self.key(), self.cache.key(self.root, 'other-image'))
+        self.assertNotEqual(self.key(), self.cache.key(self.root, 'other-builder'))
         p.unlink()
         p.symlink_to('../.config')
         with self.assertRaises(ValueError):
