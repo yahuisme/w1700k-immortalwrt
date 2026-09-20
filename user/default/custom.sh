@@ -35,6 +35,8 @@ for patch in 745-net-pcs-airoha-extend-manual-rx-calib-to-E2-silicon.patch \
     cp -f "$DK_PROFILE/patches/$patch" target/linux/airoha/patches-6.18/
 done
 patch -p1 --fuzz=0 < "$DK_PROFILE/patches/002-w1700k-cpufreq-resources.patch"
+# wifi-scripts installs directly from source; its Build/Prepare is empty.
+patch -p1 --fuzz=0 < "$DK_PROFILE/patches/920-wifi-non-mlo-ap-txpower.patch"
 mkdir -p package/network/utils/iwinfo/patches
 cp -f "$DK_PROFILE/patches/999-fix-txpower-list.patch" package/network/utils/iwinfo/patches/
 

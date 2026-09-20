@@ -14,6 +14,12 @@
 | `940-pmdomain-airoha-cpu-pll-fallback.patch`、`002-w1700k-cpufreq-resources.patch` | 标准 CPUFreq 兼容，来源上述 `972634e...` 的 940 C 代码及 W1700K 设备树资源；不重复引入 Kconfig，保留官方 attach_list、0–14 状态、500–1200 MHz 与调频策略，不超频 |
 | `998-single-wiphy.patch` | single-wiphy 无线设备的 LuCI 状态适配，仅涉及界面 |
 
+## 非 MLO AP 功率补丁
+
+`920-wifi-non-mlo-ap-txpower.patch` 为本项目本地实现，由 `custom.sh` 在官方源码根目录直接应用。通过私有 hostapd 元数据，在 `bss_add` 后按 BSS 设置功率；功率变更沿用现有重启路径，失败记录日志并通知，不代表 netifd 已确认应用成功。
+
+支持范围是同一共享 PHY 上所有活动的索引 radio 均仅使用非 MLO AP。若其他 radio 混用 MLO 或非 AP 模式，其上游 PHY 全局设置仍可能覆盖功率，本补丁不声称解决此情况或提供 MLO 按链路控制。原生 ucode 测试验证命令、元数据与回调边界，不等于实机射频验证。
+
 ## 维护原则
 
 - 非必要不加补丁；官方已有功能和特性以官方实现为准。
