@@ -15,7 +15,7 @@ INPUTS = ('tools', 'toolchain', 'include', 'scripts', 'config', 'target/linux/ge
           'rules.mk', 'Makefile', 'Config.in', '.config')
 # Fixed per-variant budgets.  dl is deliberately above the measured rolling
 # archives (1.49/1.92 GB); do not turn a useful download cache into a miss.
-LIMITS = {'toolchain': 2_000_000_000, 'ccache': 1_500_000_000, 'dl': 2_200_000_000}
+LIMITS = {'toolchain': 2_000_000_000, 'ccache': 3_000_000_000, 'dl': 2_200_000_000}
 
 
 def key(root, builder):

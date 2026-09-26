@@ -105,7 +105,6 @@ fi
 # 999 iwinfo txpower list (locally audited copy)
 # -------------------------------------------------
 mkdir -p package/firmware/wireless-regdb/patches
-mkdir -p package/network/utils/iwinfo/patches
 
 if [ -f "$DK_PROFILE/patches/610-w1700k-us-power-30.patch" ]; then
     cp -f "$DK_PROFILE/patches/610-w1700k-us-power-30.patch" package/firmware/wireless-regdb/patches/

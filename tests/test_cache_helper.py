@@ -92,6 +92,32 @@ class HelperTests(unittest.TestCase):
     def deletes(self):
         return [c for c in self.snapshot()['calls'] if c[:2] == ['cache', 'delete']]
 
+    def test_three_gb_compiler_budget_and_pack_boundary(self):
+        from unittest.mock import patch
+        from test_cache_key import load, SCRIPT
+        from test_cache_workflow import step
+        cache = load(SCRIPT)
+        self.assertEqual(cache.LIMITS['ccache'], 3_000_000_000)
+        self.assertEqual(h.SLOTS['cc-v3-ubi2.'], 3_000_000_000)
+        self.assertEqual(h.BUDGET, 10_000_000_000)
+        self.assertEqual(h.HEADROOM, 64 * 1024 * 1024)
+        self.assertIn('CCACHE_MAXSIZE=3G ', step('Compile firmware')['run'])
+        for size, accepted in ((3_000_000_000, True), (3_000_000_001, False)):
+            with self.subTest(size=size):
+                self.reset([])
+                self.assertEqual(self.admit(size), accepted)
+                self.assertEqual(self.deletes(), [])
+                archive_dir = self.base / 'packed'
+                archive = archive_dir / 'ccache.tar.gz'
+                def tar(*args, **kwargs):
+                    with archive.open('wb') as stream:
+                        stream.truncate(size)
+                # Only the external compressor is mocked; real pack rejection
+                # and sparse-file admission exercise both independent caps.
+                with patch.object(cache.subprocess, 'run', side_effect=tar):
+                    cache.pack(self.base, archive_dir, 'ccache', 'unused')
+                self.assertEqual(archive.exists(), accepted)
+
     def test_missing_zero_oversize_and_ownership(self):
         for size in (None, 0, h.SLOTS['cc-v3-ubi2.'] + 1):
             with self.subTest(size=size):
@@ -140,6 +166,15 @@ class HelperTests(unittest.TestCase):
             self.assertTrue(self.admit(size, prefix), self.log)
             entries.append(entry(len(entries)+1, prefix+'new', size+h.HEADROOM))
         self.assertLessEqual(sum(e['size_in_bytes'] for e in entries), 10_000_000_000)
+
+    def test_full_slots_decline_three_gb_replacement_without_deletion(self):
+        entries = [entry(index, prefix + 'old', size)
+                   for index, (prefix, size) in enumerate(h.SLOTS.items(), 1)]
+        self.reset(entries)
+        self.assertFalse(self.admit(3_000_000_000))
+        self.assertIn('candidate+margin=3067108864', self.log)
+        self.assertEqual(self.snapshot()['entries'], entries)
+        self.assertEqual(self.deletes(), [])
 
     def test_legacy_oc_counts_against_single_budget(self):
         size = 1_000_000_000

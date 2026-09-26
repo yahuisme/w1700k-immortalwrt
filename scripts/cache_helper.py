@@ -11,7 +11,7 @@ import subprocess
 import sys
 import time
 
-SLOTS = {'tc-v3-ubi2-': 2_000_000_000, 'cc-v3-ubi2.': 1_500_000_000,
+SLOTS = {'tc-v3-ubi2-': 2_000_000_000, 'cc-v3-ubi2.': 3_000_000_000,
          'dl-v3.': 2_200_000_000}
 BUDGET = 10_000_000_000
 HEADROOM = 64 * 1024 * 1024

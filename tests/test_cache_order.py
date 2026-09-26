@@ -61,6 +61,8 @@ class CacheOrderTests(unittest.TestCase):
             successful = True
             saves, logs = [], []
             for step in STEPS[start:]:
+                if step['name'] == 'Publish firmware and prune releases':
+                    break  # Publication/status semantics live in test_publish_order.
                 if not successful or not condition(step.get('if', 'True')):
                     continue
                 if 'run' in step:

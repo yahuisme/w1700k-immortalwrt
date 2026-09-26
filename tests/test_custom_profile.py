@@ -11,6 +11,11 @@ CUSTOM = (ROOT / 'user/default/custom.sh').read_text()
 
 
 class CustomProfile(unittest.TestCase):
+    def test_iwinfo_directory_created_once_before_copy(self):
+        command = 'mkdir -p package/network/utils/iwinfo/patches'
+        self.assertEqual(CUSTOM.count(command), 1)
+        self.assertLess(CUSTOM.index(command), CUSTOM.index('cp -f "$DK_PROFILE/patches/999-fix-txpower-list.patch"'))
+
     def test_explicit_packages_keep_driver_injection(self):
         config = (ROOT / 'user/default/config.diff').read_text().splitlines()
         for package in ('kmod-crypto-hw-eip93', 'kmod-phy-rtl8261ce'):
