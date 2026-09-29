@@ -16,16 +16,12 @@ class CustomProfile(unittest.TestCase):
         self.assertEqual(CUSTOM.count(command), 1)
         self.assertLess(CUSTOM.index(command), CUSTOM.index('cp -f "$DK_PROFILE/patches/999-fix-txpower-list.patch"'))
 
-    def test_explicit_packages_keep_driver_injection(self):
+    def test_explicit_packages_keep_required_crypto(self):
         config = (ROOT / 'user/default/config.diff').read_text().splitlines()
-        for package in ('kmod-crypto-hw-eip93', 'kmod-phy-rtl8261ce'):
-            self.assertIn(f'CONFIG_PACKAGE_{package}=y', config)
+        self.assertIn('CONFIG_PACKAGE_kmod-crypto-hw-eip93=y', config)
         self.assertNotIn('CONFIG_PACKAGE_bridge-hw-offload=y', config)
         self.assertNotIn('001-add-bridge-flowtable-support.patch', CUSTOM)
         self.assertNotIn('920-bridge-hw-offload-lifecycle.patch', CUSTOM)
-        self.assertIn('define KernelPackage/phy-rtl8261ce', CUSTOM)
-        self.assertIn('999-net-phy-realtek-rtl8261ce.patch', CUSTOM)
-        self.assertIn('rtl8261ce/Kconfig', CUSTOM)
 
     def test_complete_aurora_fragment(self):
         start = CUSTOM.index('echo "Installing latest Aurora')

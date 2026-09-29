@@ -2,12 +2,13 @@
 
 基于 [ImmortalWrt 官方 master](https://github.com/immortalwrt/immortalwrt) 及官方 feeds。构建环境使用本仓库维护的官方 Debian Dockerfile。以下为明确保留的本地补丁，不在构建时整批镜像 fork。
 
+RTL8261CE 使用官方 Realtek 驱动及 W1700K 默认选择的 `rtl8261c-firmware`，已核实于官方 master `bf156b68e3`。
+
 ## 本地补丁
 
 | 文件 | 用途与来源 |
 | --- | --- |
 | `745-*`、`746-*` | E2 PCS RX 校准、MDIO 识别前的 PHY 复位处理；来源 OpenWRT-fanboy/OpenW1700k `972634e64d19cba0095b662a0bfd9561ebef635c` 的 `target/linux/airoha/patches-6.18/` |
-| `999-net-phy-realtek-rtl8261ce.patch`、`../tree/target/linux/generic/files/drivers/net/phy/rtl8261ce/` | RTL8261CE 驱动与 Kconfig/Makefile 接入，源自 OpenW1700k 的 Jihong Min 实现；`PHY_ID_MATCH_MODEL(0x001cc890)` 的匹配范围包含 `0x001cc898` / `0x001cc899`，不是设备实测 ID。当前官方 C/D 支持与之部分重叠，但尚无完整 CE 替代，因此保留独立驱动 |
 | `910-mt76-*`、`911-mt76-*` | OpenW1700k 无线固件功率限制启用与刷新的本地适配，仅保留这两个 mt76 定制补丁 |
 | `610-w1700k-us-power-30.patch` | 在官方 regdb 补丁基础上追加本项目 US 30 dBm 配置 |
 | `999-fix-txpower-list.patch` | iwinfo 功率列表展示，来源上述 `972634e...` 的 `package/network/utils/iwinfo/patches/` |

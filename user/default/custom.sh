@@ -55,47 +55,6 @@ cp -f "$DK_PROFILE/patches/910-mt76-mt7996-enable-firmware-txpower-limit.patch" 
     package/kernel/mt76/patches/
 echo "mt76: official package + two power-limit patches"
 
-cp -f "$DK_PROFILE/patches/999-net-phy-realtek-rtl8261ce.patch" \
-    target/linux/generic/hack-6.18/
-echo "kernel: rtl8261ce PHY patch installed"
-
-# rtl8261ce driver files + fork tree files cannot reach target/linux/...
-# or package/... via the rootfs files/ overlay, so copy them into the
-# buildroot tree explicitly (same paths as the OpenW1700k fork).
-TREE="$DK_PROFILE/tree"
-mkdir -p target/linux/generic/files/drivers/net/phy/rtl8261ce
-cp -f "$TREE"/target/linux/generic/files/drivers/net/phy/rtl8261ce/* \
-    target/linux/generic/files/drivers/net/phy/rtl8261ce/
-if [ ! -f target/linux/generic/files/drivers/net/phy/rtl8261ce/Kconfig ]; then
-    echo "ERROR: rtl8261ce driver files missing after injection; abort" >&2
-    exit 1
-fi
-echo "rtl8261ce: driver files injected into target/linux/generic/files"
-# -------------------------------------------------
-# rtl8261ce kmod definition (fork netdevices.mk mirror)
-# -------------------------------------------------
-NDM=package/kernel/linux/modules/netdevices.mk
-if ! grep -q 'phy-rtl8261ce' "$NDM"; then
-    cat >> "$NDM" <<'EOF'
-
-define KernelPackage/phy-rtl8261ce
-   SUBMENU:=$(NETWORK_DEVICES_MENU)
-   TITLE:=Realtek RTL8261CE 10GBASE-T PHY driver
-   KCONFIG:=CONFIG_RTL8261CE_PHY
-   DEPENDS:=+kmod-libphy +kmod-hwmon-core
-   FILES:=$(LINUX_DIR)/drivers/net/phy/rtl8261ce/rtk-rtl8261ce-phy.ko
-   AUTOLOAD:=$(call AutoLoad,18,rtk-rtl8261ce-phy,1)
-endef
-
-define KernelPackage/phy-rtl8261ce/description
-   Supports the Realtek RTL8261CE 10GBASE-T PHY.
-endef
-
-$(eval $(call KernelPackage,phy-rtl8261ce))
-EOF
-    echo "netdevices.mk: phy-rtl8261ce kmod added"
-fi
-
 # -------------------------------------------------
 # Wireless fixes (quilt-applied)
 # 610 US power boost (self-maintained, applied after official 500/600):
@@ -200,8 +159,8 @@ fi
 
 echo "Airoha LuCI configuration completed."
 
-# Feeds install indexed packages before the custom apps, theme and PHY
-# recipe were injected. Drop the index so make defconfig discovers them
+# Feeds install indexed packages before the custom apps and theme
+# were injected. Drop the index so make defconfig discovers them
 # and their built-in luci-i18n-*-zh-cn packages.
 rm -rf tmp/info 2>/dev/null || true
 rm -f tmp/.packageinfo 2>/dev/null || true
