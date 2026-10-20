@@ -14,7 +14,9 @@ SCRIPT = Path(__file__).resolve().parents[1] / 'scripts/cache.py'
 def load(path):
     spec = importlib.util.spec_from_file_location('cache_under_test', path)
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    from unittest.mock import patch
+    with patch.dict(os.environ, DK_PROFILE=str(SCRIPT.parents[1] / 'user/default')):
+        spec.loader.exec_module(module)
     return module
 
 

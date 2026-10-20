@@ -10,6 +10,10 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
+PROFILE = json.loads((ROOT / 'user/default/build.json').read_text())
+TC = PROFILE['cache_prefix']['tc']
+CC = PROFILE['cache_prefix']['cc']
+DL = PROFILE['cache_prefix']['dl']
 HELPER = ROOT / 'scripts/cache_helper.py'
 spec = importlib.util.spec_from_file_location('cache_helper', HELPER)
 assert spec is not None and spec.loader is not None
@@ -80,7 +84,7 @@ class HelperTests(unittest.TestCase):
         self.assertEqual(result.returncode, expected, result.stderr)
         return result.stdout
 
-    def admit(self, size, prefix='cc-v3-ubi2.', key=None):
+    def admit(self, size, prefix=CC, key=None):
         if size is not None:
             with self.archive.open('wb') as f:
                 f.truncate(size)  # sparse fixture, not multi-GB allocated data
@@ -97,7 +101,7 @@ class HelperTests(unittest.TestCase):
         from test_cache_key import load, SCRIPT
         cache = load(SCRIPT)
         self.assertEqual(cache.LIMITS['ccache'], 3_000_000_000)
-        self.assertEqual(h.SLOTS['cc-v3-ubi2.'], 3_000_000_000)
+        self.assertEqual(h.SLOTS[CC], 3_000_000_000)
         self.assertEqual(h.BUDGET, 10_000_000_000)
         self.assertEqual(h.HEADROOM, 64 * 1024 * 1024)
         packed = self.base / 'packed'
@@ -122,13 +126,14 @@ class HelperTests(unittest.TestCase):
         from unittest.mock import patch
         from test_cache_key import load, SCRIPT
         cache = load(SCRIPT)
-        self.assertEqual(cache.LIMITS['dl'], 3_000_000_000)
-        self.assertEqual(h.SLOTS['dl-v3.'], 3_000_000_000)
+        self.assertEqual(cache.LIMITS['dl'], 3_200_000_000)
+        self.assertEqual(h.SLOTS[next(p for p in h.SLOTS if p.startswith('dl-'))], 3_200_000_000)
         packed = self.base / 'packed'
         archive = packed / 'dl.tar.gz'
         fixture = json.loads((ROOT / 'tests/fixtures/download-cache-inventory.json').read_text())
         cases = [(size, True) for size in fixture['measured_bytes'].values()]
-        cases += [(3_000_000_000, True), (3_000_000_001, False)]
+        cases += [(3_073_054_226, True), (3_062_846_599, True),
+                  (3_200_000_000, True), (3_200_000_001, False)]
         for size, accepted in cases:
             with self.subTest(size=size):
                 def compress(args, **kwargs):
@@ -141,7 +146,7 @@ class HelperTests(unittest.TestCase):
                     cache.pack(self.base, packed, 'dl', 'unused')
                 self.assertEqual(archive.exists(), accepted)
                 self.reset([])
-                self.assertEqual(self.admit(size, 'dl-v3.'), accepted, self.log)
+                self.assertEqual(self.admit(size, DL), accepted, self.log)
                 self.assertFalse(self.deletes())
 
     def test_current_paginated_inventory_and_three_gb_double_generation(self):
@@ -158,14 +163,14 @@ class HelperTests(unittest.TestCase):
                 inventory = [dict(e) for e in entries]
                 if maximal_old:
                     for e in inventory:
-                        if h.owner(e['key']) == 'dl-v3.':
+                        if h.owner(e['key']) == DL:
                             # Conservatively reserve an outer wrapper for the old
                             # 3 GB inner archive as well as the new candidate.
-                            e['size_in_bytes'] = 3_000_000_000 + h.HEADROOM
-                for size in (fixture['measured_bytes'][distro], 3_000_000_000):
+                            e['size_in_bytes'] = 3_200_000_000 + h.HEADROOM
+                for size in (fixture['measured_bytes'][distro], 3_200_000_000):
                     with self.subTest(distro=distro, maximal_old=maximal_old, size=size):
                         self.reset(inventory)
-                        self.assertTrue(self.admit(size, 'dl-v3.'), self.log)
+                        self.assertTrue(self.admit(size, DL), self.log)
                         self.assertFalse(self.deletes())
                         self.assertEqual(self.snapshot()['entries'], inventory)
 
@@ -189,7 +194,7 @@ class HelperTests(unittest.TestCase):
                    entry(4, 'cc-v3-ubi2-oc.old', 547_492_660),
                    entry(5, 'dl-v3.old', 1_941_241_977)]
         self.reset(entries)
-        self.assertTrue(self.admit(1_941_714_961, 'dl-v3.'), self.log)
+        self.assertTrue(self.admit(1_941_714_961, DL), self.log)
         self.assertFalse(self.deletes())
         self.assertEqual(self.snapshot()['entries'], entries)
 
@@ -198,15 +203,15 @@ class HelperTests(unittest.TestCase):
         used = h.BUDGET - size - h.HEADROOM
         for extra, expected in ((0, True), (1, False)):
             self.reset([entry(1, 'retired-cache', used + extra)])
-            self.assertEqual(self.admit(size, 'dl-v3.'), expected)
+            self.assertEqual(self.admit(size, DL), expected)
             self.assertFalse(self.deletes())
 
     def test_missing_zero_oversize_and_ownership(self):
-        for size in (None, 0, h.SLOTS['cc-v3-ubi2.'] + 1):
+        for size in (None, 0, h.SLOTS[CC] + 1):
             with self.subTest(size=size):
                 self.assertFalse(self.admit(size))
-        self.assertFalse(self.admit(1, 'tc-v3-ubi2-', 'tc-v3-ubi2-oc-new'))
-        self.assertFalse(self.admit(1, key='cc-v3-ubi2.'))
+        self.assertFalse(self.admit(1, TC, 'tc-v3-ubi2-oc-new'))
+        self.assertFalse(self.admit(1, key=CC))
         self.assertEqual(self.snapshot()['calls'], [])
 
     def test_boundary_includes_margin_and_all_generations_refs(self):
@@ -232,8 +237,8 @@ class HelperTests(unittest.TestCase):
                    for i, (prefix, size) in enumerate(h.SLOTS.items(), 1)]
         self.reset(entries)
         self.assertGreater(sum(h.SLOTS.values()) +
-                           h.SLOTS['cc-v3-ubi2.'] + h.HEADROOM, h.BUDGET)
-        self.assertFalse(self.admit(h.SLOTS['cc-v3-ubi2.']))
+                           h.SLOTS[CC] + h.HEADROOM, h.BUDGET)
+        self.assertFalse(self.admit(h.SLOTS[CC]))
         self.assertIn('repository budget exceeded', self.log)
         self.assertFalse(self.deletes())
         self.assertEqual(self.snapshot()['entries'], entries)
@@ -283,7 +288,7 @@ class HelperTests(unittest.TestCase):
                 entry(7, 'tc-v3-ubi2-other', ref='refs/heads/other'),
                 entry(8, 'dl-v3.peer')]
 
-    def cleanup(self, key='tc-v3-ubi2-new', prefix='tc-v3-ubi2-'):
+    def cleanup(self, key='tc-v3-ubi2-new', prefix=TC):
         return self.run_helper('cleanup', prefix, key)
 
     def test_delayed_save_visibility_rechecks_before_deleting(self):
@@ -310,7 +315,7 @@ class HelperTests(unittest.TestCase):
 
     def test_visibility_retry_is_bounded_and_fails_closed(self):
         from unittest.mock import patch
-        prefix, keep = 'cc-v3-ubi2.', 'cc-v3-ubi2.new'
+        prefix, keep = CC, 'cc-v3-ubi2.new'
         old = entry(2, prefix + 'old')
         for pending in ([old], [entry(1, keep, size=0), old],
                         [entry(1, keep, ref='refs/heads/other'), old]):

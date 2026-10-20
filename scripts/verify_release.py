@@ -8,16 +8,27 @@ import subprocess
 import sys
 from urllib.parse import quote
 
+try:
+    from .build_profile import load
+except ImportError:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from build_profile import load
+
 
 def verify(tag, files):
+    expected = {Path(name).name: Path(name) for name in files}
+    if (not files or len(expected) != len(files)
+            or set(expected) != set(load(Path(__file__).resolve().parents[1] / 'user/default')['images'])
+            or any(p.is_symlink() or not p.is_file() or not p.stat().st_size
+                   for p in expected.values())):
+        raise ValueError('Expected complete nonempty firmware image set')
     repository = os.environ['GITHUB_REPOSITORY']
     release = json.loads(subprocess.check_output([
         'gh', 'api', f'repos/{repository}/releases/tags/{quote(tag, safe="")}']))
     if release['tag_name'] != tag or release['draft'] or release['prerelease']:
         raise ValueError('Unexpected release identity/state')
     assets = release['assets']
-    expected = {Path(name).name: Path(name) for name in files}
-    if not expected or len(expected) != len(files) or len(assets) != len(expected):
+    if len(assets) != len(expected):
         raise ValueError('Release asset count mismatch')
     if {asset['name'] for asset in assets} != set(expected):
         raise ValueError('Release asset names mismatch')

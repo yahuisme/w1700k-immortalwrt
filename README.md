@@ -45,6 +45,7 @@
 ## 构建
 
 每日自动构建，也可手动运行 Actions。仅发布 `sysupgrade.itb`。
-构建记录位于对应 Actions 运行的 `build-record-*` artifact，保留 30 天；失败时保留已取得的诊断信息。
+构建记录位于对应 Actions 运行的 `build-record-*` artifact，保留 30 天；统一 `build.json` 记录实际源码、feed、定制组件、构建器及镜像摘要。
+`user/default/build.json` 定义本仓库的目标、镜像和缓存命名空间；公共 helper 保持三仓一致。
 
 [补丁说明与来源](https://github.com/yahuisme/packages/tree/main/w1700k-patches/SOURCES.md)

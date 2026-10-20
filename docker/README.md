@@ -6,6 +6,7 @@ There are no preseeded source, staging or compiler caches. Root execution and al
 existing cache/profile/artifact mounts are preserved.
 
 Base: official Debian trixie-slim linux/arm64 platform manifest pinned in Dockerfile.
+Cache archives use pigz for parallel gzip; speed gains require CI measurement.
 Go: official go.dev ARM64 1.26.8 archive, SHA-256 verified before extraction to
 `/usr/lib/go`; this is the external bootstrap, not a replacement for feed-built Go.
 Apt packages deliberately receive official trixie security updates; see

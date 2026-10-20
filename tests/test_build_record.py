@@ -41,7 +41,7 @@ class BuildRecordTests(unittest.TestCase):
                         self.assertEqual(path.stat().st_mode & 0o444, 0o444)
                 if not missing:
                     revisions = json.loads((record / 'revisions.json').read_text())
-                    self.assertEqual({r['name'] for r in revisions}, {'source', 'feed/packages'})
+                    self.assertEqual({r['name'] for r in revisions}, {'source', 'feed/packages', 'custom/yahuisme/packages', 'custom/luci-theme-aurora', 'custom/luci-app-aurora-config'})
                     sha = subprocess.check_output(['git', '-C', tmp, 'rev-parse', 'HEAD'], text=True).strip()
                     self.assertEqual(revisions[0]['sha'], sha)
 
@@ -162,21 +162,21 @@ class BuildRecordTests(unittest.TestCase):
                 (base / 'firmware').mkdir()
                 (base / 'firmware/version.txt').write_text(CURRENT)
                 (base / 'firmware/release-notes.md').write_text('fixture')
-                (base / 'firmware/image-sysupgrade.itb').write_bytes(b'local fixture image')
+                (base / 'firmware' / IMAGE).write_bytes(b'local fixture image')
                 readback = READBACK.replace('    print(json.dumps', '    '+mutation+'\n    print(json.dumps')
                 if mode == 'draft':
                     readback = readback.replace('draft=False', 'draft=True')
                 stub = GH.replace(READBACK, readback)
                 stub = stub.replace("elif args[0] == 'api' and '/releases/tags/'", """elif args[0] == 'api' and '/releases/assets/' in args[1]:
     if os.environ['MODE']=='download-failure': sys.exit(17)
-    sys.stdout.buffer.write(b'bad' if os.environ['MODE']=='download-wrong' else Path('firmware/image-sysupgrade.itb').read_bytes())
+    sys.stdout.buffer.write(b'bad' if os.environ['MODE']=='download-wrong' else (Path('firmware') / os.environ['IMAGE']).read_bytes())
 elif args[0] == 'api' and '/releases/tags/'""")
                 (base / 'gh').write_text(stub)
                 (base / 'gh').chmod(0o755)
                 (base / 'pages.json').write_text(json.dumps([[release(CURRENT, 3),
                     release(PREFIX+'previous', 2), release(PREFIX+'old', 1)]]))
                 env = dict(os.environ, PATH=tmp+':'+os.environ['PATH'], GITHUB_SHA='a'*40,
-                           GITHUB_REPOSITORY='fixture/repo', FAULT='', MODE=mode)
+                           GITHUB_REPOSITORY='fixture/repo', FAULT='', MODE=mode, IMAGE=IMAGE)
                 result = subprocess.run(['bash', '-eo', 'pipefail', '-c',
                     step('Publish firmware and prune releases')['run']], cwd=base, env=env,
                     capture_output=True, text=True)

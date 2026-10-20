@@ -9,6 +9,7 @@ import unittest
 
 from test_cache_workflow import step, ROOT
 from record_fixture import READBACK
+from test_release_safety import IMAGE
 
 BLOCK = step('Publish firmware and prune releases')['run']
 PREFIX_MATCH = re.search(r'PREFIX="([^"]+)"', BLOCK)
@@ -52,7 +53,7 @@ class RetentionTests(unittest.TestCase):
             (base / 'firmware').mkdir()
             (base / 'firmware/version.txt').write_text(CURRENT + '\n')
             (base / 'firmware/release-notes.md').write_text('fixture')
-            (base / 'firmware/fixture-sysupgrade.itb').write_text('not firmware')
+            (base / 'firmware' / IMAGE).write_text('not firmware')
             (base / 'gh').write_text(GH)
             (base / 'gh').chmod(0o755)
             (base / 'pages.json').write_text(pages if isinstance(pages, str) else json.dumps(pages))

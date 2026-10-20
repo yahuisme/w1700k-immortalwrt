@@ -7,7 +7,7 @@ cat /etc/os-release
 test "$(dpkg --print-architecture)" = arm64
 test ! -e /bld/openwrt
 printf 'Required commands\n'
-for cmd in bash make gcc g++ ld ar patch diff find xargs cp seq grep getopt realpath stat gzip unzip bzip2 wget install perl python3 file which git rsync curl flock mountpoint tar cpio pkg-config swig bison flex gawk xz zstd msgfmt; do
+for cmd in bash make gcc g++ ld ar patch diff find xargs cp seq grep getopt realpath stat gzip unzip bzip2 wget install perl python3 file which git rsync curl flock mountpoint tar pigz cpio pkg-config swig bison flex gawk xz zstd msgfmt; do
     command -v "$cmd"
 done
 gcc -dumpfullversion

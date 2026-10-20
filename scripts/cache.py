@@ -10,12 +10,21 @@ import shutil
 import subprocess
 import sys
 
+try:
+    from .build_profile import load
+except ImportError:
+    try:
+        from scripts.build_profile import load
+    except ImportError:
+        from build_profile import load
+
+BOARD, SUBTARGET = load(Path(__file__).resolve().parents[1] / 'user/default')["target"].split("/")
 EPOCH = 946684800
-INPUTS = ('tools', 'toolchain', 'include', 'scripts', 'config', 'target/linux/generic', 'target/linux/airoha',
+INPUTS = ('tools', 'toolchain', 'include', 'scripts', 'config', 'target/linux/generic', 'target/linux/' + BOARD,
           'rules.mk', 'Makefile', 'Config.in', '.config')
 # Compressed archive caps; oversized output is declined, never forced through.
-# dl allows the measured 2.403/2.356 GB archives; total admission stays separate.
-LIMITS = {'toolchain': 2_000_000_000, 'ccache': 3_000_000_000, 'dl': 3_000_000_000}
+# dl covers the measured 3.073/3.063 GB archives; total admission stays separate.
+LIMITS = {'toolchain': 2_000_000_000, 'ccache': 3_000_000_000, 'dl': 3_200_000_000}
 
 
 def key(root, builder):
@@ -34,7 +43,7 @@ def key(root, builder):
     # unselected subtargets); unknown expressions keep the full generic tree.
     versions = set()
     normal_version = False
-    platform = root / 'target/linux/airoha'
+    platform = root / 'target/linux' / BOARD
     for p in [platform / 'Makefile', *sorted(platform.glob('*/target.mk'))]:
         if p.is_symlink():
             raise ValueError('unsupported linked input: ' + str(p.relative_to(root)))
@@ -66,7 +75,7 @@ def key(root, builder):
             # Runtime rootfs overlays, consumed by package/base-files/install;
             # not kernel files/patches. Keep base-files.mk and all target.mk.
             if any(rel.is_relative_to(Path('target/linux') / overlay) for overlay in (
-                    'generic/base-files', 'airoha/base-files', 'airoha/an7581/base-files')):
+                    'generic/base-files', f'{BOARD}/base-files', f'{BOARD}/{SUBTARGET}/base-files')):
                 continue
             # Only direct, recognized generic version roots are version-scoped
             # by target.mk/kernel-version.mk. Shared and unfamiliar names stay.
