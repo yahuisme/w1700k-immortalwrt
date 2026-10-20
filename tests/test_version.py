@@ -25,7 +25,7 @@ class VersionTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if not SOURCE:
-            raise RuntimeError("Set IMMORTALWRT_SOURCE to the official ImmortalWrt git checkout")
+            raise unittest.SkipTest("set IMMORTALWRT_SOURCE to the official ImmortalWrt git checkout")
         cls.source = Path(SOURCE).resolve()
         cls.sha = run(["git", "rev-parse", "HEAD"], cls.source).strip()
         cls.files = {}
@@ -96,7 +96,9 @@ all:
             env = os.environ.copy()
             env.pop("TOPDIR", None)
             original = run(["./scripts/getver.sh"], root, env=env).strip()
-            match = re.fullmatch(r"r([0-9]+)(-[0-9a-f]+)", original)
+            # ImmortalWrt's rolling revision may include the upstream commit
+            # count after the base revision, for example r0+42541-<sha>.
+            match = re.fullmatch(r"r([0-9]+(?:\+[0-9]+)?)(-[0-9a-f]+)", original)
             assert match is not None, original
             self.assertTrue(self.sha.startswith(match[2][1:]), (self.sha, original))
             expected = original

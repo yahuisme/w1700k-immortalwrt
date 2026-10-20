@@ -31,6 +31,8 @@ class ProfileSimplification(unittest.TestCase):
     @unittest.skipUnless(os.environ.get('IMMORTALWRT_SOURCE'), 'requires prepared official source')
     def test_prepared_official_closure(self):
         source = Path(os.environ['IMMORTALWRT_SOURCE'])
+        if not (source / '.config').is_file():
+            self.skipTest('official source is not a prepared build tree')
         config = (source / '.config').read_text()
         for package in (*LUCI_DEPENDENCIES, 'kmod-phy-realtek',
                         'rtl8261c-firmware', 'rtl826x-firmware', 'kmod-tcp-bbr'):

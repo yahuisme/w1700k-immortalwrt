@@ -23,6 +23,8 @@ class ConvergenceTests(unittest.TestCase):
     @unittest.skipUnless(os.environ.get('IMMORTALWRT_SOURCE'), 'requires prepared official source')
     def test_prepared_profile(self):
         source = Path(os.environ['IMMORTALWRT_SOURCE'])
+        if not (source / '.config').is_file():
+            self.skipTest('official source is not a prepared build tree')
         config = set((source / '.config').read_text().splitlines())
         for app in ('wifi7', 'airoha-npu', 'airoha-flowsense', 'airoha-fancontrol',
                     'wol', 'ttyd', 'aurora-config'):
