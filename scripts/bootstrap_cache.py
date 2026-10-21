@@ -11,6 +11,14 @@ import subprocess
 import shutil
 import tarfile
 
+try:
+    from . import cache_config
+except ImportError:
+    try:
+        from scripts import cache_config
+    except ImportError:
+        import cache_config
+
 EPOCH = 946684800
 # Production post-customization source locks (OpenWrt 906c981d2c3b and
 # ImmortalWrt 2f97ee0c9fad): canonical JSON path/permission/content records.
@@ -115,9 +123,10 @@ def key(root, builder, tc_key):
     independent = source in REVIEWED and values.get('CONFIG_BUILD_ALL_HOST_TOOLS') != 'y'
     environment = {name: os.environ.get(name) for name in ENVIRONMENT}
     host = os.uname()
-    data = ['bootstrap-v1', builder, [host.sysname, host.release, host.version, host.machine], str(root), EPOCH,
+    data = ['bootstrap-v2', builder, [host.sysname, host.release, host.version, host.machine], str(root), EPOCH,
             hashlib.sha256(Path(__file__).read_bytes()).hexdigest(), environment,
-            hashlib.sha256(raw).hexdigest(), stat.S_IMODE((root / '.config').stat().st_mode),
+            hashlib.sha256(cache_config.policy_bytes()).hexdigest(),
+            hashlib.sha256(cache_config.fingerprint_bytes(raw)).hexdigest(), stat.S_IMODE((root / '.config').stat().st_mode),
             source, None if independent else tc_key]
     print('bootstrap contract=' + ('reviewed-independent' if independent else 'full-toolchain-bound'),
           file=sys.stderr)

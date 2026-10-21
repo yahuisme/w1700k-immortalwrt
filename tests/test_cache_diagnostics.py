@@ -1,4 +1,4 @@
-"""Grouped cache-input diagnostics must not change the exact toolchain key."""
+"""Diagnostics do not change the CURRENT generation compatibility policy."""
 import contextlib
 import importlib.util
 import inspect
@@ -15,8 +15,7 @@ import unittest
 from unittest.mock import patch
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'scripts/cache.py'
-# An optional frozen helper allows comparison at the SAME absolute source path.
-BASELINE = os.environ.get('CACHE_DIAGNOSTICS_BASELINE')
+# Baseline is generated from current policy below; legacy digests are retired.
 
 
 def load(path):
@@ -129,11 +128,14 @@ class CacheDiagnosticsTests(unittest.TestCase):
         self.groups(result.stderr)
         self.assertNotIn('ignored stdin secret', result.stderr)
 
-    @unittest.skipUnless(BASELINE, 'set CACHE_DIAGNOSTICS_BASELINE to frozen old helper')
-    def test_frozen_legacy_key_source_reads_order_and_mtimes(self):
-        assert BASELINE is not None
-        legacy = load(Path(BASELINE))
-        # The diagnostic normalization must yield precisely the original policy.
+    def test_current_policy_without_diagnostics_same_source_reads_order_and_mtimes(self):
+        # Intentionally NOT a frozen v8 key comparison: v9 is a cold generation.
+        # Strip only marked diagnostic lines from this exact current policy.
+        baseline = Path(self.tmp.name) / 'current_policy_no_diagnostics.py'
+        baseline.write_text(''.join(line for line in SCRIPT.read_text().splitlines(keepends=True)
+                                    if not line.endswith('  # cache diagnostic\n')))
+        legacy = load(baseline)
+        # Both implementations lock the shared helper and current policy.
         self.assertEqual(self.cache.key_policy_source(), inspect.getsource(legacy.key))
         for change in ('unchanged', 'content', 'mode', 'config', 'builder', 'host', 'generated', 'mtime'):
             with self.subTest(change=change):

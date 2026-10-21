@@ -11,6 +11,14 @@ import subprocess
 import sys
 
 try:
+    from . import cache_config
+except ImportError:
+    try:
+        from scripts import cache_config
+    except ImportError:
+        import cache_config
+
+try:
     from .build_profile import load
 except ImportError:
     try:
@@ -28,17 +36,14 @@ LIMITS = {'toolchain': 2_000_000_000, 'ccache': 3_000_000_000, 'dl': 3_200_000_0
 
 
 def key_policy_source():
-    """Exclude only diagnostic plumbing, retaining the exact pre-diagnostic policy.
+    """Fingerprint current compatibility logic, excluding diagnostics only.
 
-    All input selection, serialization and safety checks remain self-fingerprinted.
-    Keep these narrowly matched replacements in sync with the marked statements;
-    a frozen legacy-helper regression checks the resulting source byte for byte.
+    Diagnostics are standalone marked lines; serialization has no source-string
+    rewrites. The shared hash-only algorithm is separately locked in key().
+    This is a new generation, not a reconstruction of the legacy v8 digest.
     """
-    source = ''.join(line for line in inspect.getsource(key).splitlines(keepends=True)
-                     if not line.endswith('  # cache diagnostic\n'))
-    return source.replace('key_policy_source()', 'inspect.getsource(key)').replace(
-        '(record := json.dumps([name, modes[name], hashlib.sha256(data).hexdigest()]).encode())',
-        'json.dumps([name, modes[name], hashlib.sha256(data).hexdigest()]).encode()')
+    return ''.join(line for line in inspect.getsource(key).splitlines(keepends=True)
+                   if not line.endswith('  # cache diagnostic\n'))
 
 
 def record_input_group(groups, name, record):
@@ -48,11 +53,12 @@ def record_input_group(groups, name, record):
 
 
 def key(root, builder):
-    # Full final configuration and source; no historical projection or fallback.
+    # Final defconfig; ignore only hash-only canonical unselected-package noise.
     # Archive/upload edits do not participate in the compatibility policy.
-    digest = hashlib.sha256(json.dumps(['tc-inputs-v8', builder, os.uname().machine,
+    digest = hashlib.sha256(json.dumps(['tc-inputs-v9', builder, os.uname().machine,
                                       str(root), EPOCH, INPUTS,
-                                      key_policy_source()]).encode())
+                                      key_policy_source(),
+                                      hashlib.sha256(cache_config.policy_bytes()).hexdigest()]).encode())
     groups = {'environment': digest.copy(), **{name: hashlib.sha256() for name in INPUTS}}  # cache diagnostic
     if not (root / '.config').is_file():
         raise ValueError('missing input: .config')
@@ -119,7 +125,10 @@ def key(root, builder):
                 modes[str(rel)] = p.stat().st_mode
                 os.utime(p, (EPOCH, EPOCH))
     for name, data in sorted(files.items()):
-        digest.update((record := json.dumps([name, modes[name], hashlib.sha256(data).hexdigest()]).encode()))
+        if name == '.config':
+            data = cache_config.fingerprint_bytes(data)
+        record = json.dumps([name, modes[name], hashlib.sha256(data).hexdigest()]).encode()
+        digest.update(record)
         record_input_group(groups, name, record)  # cache diagnostic
     print('cache-inputs sha256/16 ' + ' '.join(f'{name}={value.hexdigest()[:16]}' for name, value in groups.items()), file=sys.stderr)  # cache diagnostic
     return digest.hexdigest()

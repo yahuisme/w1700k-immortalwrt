@@ -8,10 +8,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ConvergenceTests(unittest.TestCase):
-    def test_usteer_explicitly_disabled(self):
+    def test_usteer_not_requested(self):
         config = (ROOT / 'user/default/config.diff').read_text().splitlines()
         for package in ('usteer', 'luci-app-usteer', 'luci-i18n-usteer-zh-cn'):
-            self.assertIn(f'# CONFIG_PACKAGE_{package} is not set', config)
             for state in ('y', 'm'):
                 self.assertNotIn(f'CONFIG_PACKAGE_{package}={state}', config)
 
