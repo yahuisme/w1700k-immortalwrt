@@ -24,12 +24,13 @@ or a claim of bit-reproducible apt/image contents. Do not introduce mutable
 non-dpkg downloads, build-arg overrides or ad-hoc container mutations without
 verified identities in this contract. Implementation changes invalidate identity.
 
-Only toolchain restore is exact (no prefix fallback). Existing compiler/download
-cache prefixes, sizes, repository admission budget and scheduling are unchanged.
-There is no CONFIG projection, audited-source lock or historical commit dependency.
-This policy change deliberately starts a new exact-key generation; no old-key
-fallback is allowed. Package/version settings and literal DEFAULT_PACKAGES changes
-remain invalidators. External mutable compiler/kernel/source trees are rejected.
+Toolchain restore remains exact (no prefix fallback); its key and archive format
+are unchanged by diagnostics or the independent compiler-bootstrap tier. Existing
+compiler/download namespaces and scheduling are retained. The toolchain policy
+has no CONFIG projection or audited-source lock. Package/version settings and
+literal DEFAULT_PACKAGES changes remain invalidators. External mutable compiler,
+kernel and source trees are rejected. Bootstrap's narrower audited contract is
+separate; it does not authorize restoring an incompatible cross-toolchain.
 
 The three explicit generic/Airoha runtime `base-files` overlays and ignored
 `scripts/config` generated outputs are excluded. Recognized direct generic
@@ -42,6 +43,41 @@ kernel files/patches and target recipes remain inputs. Input mtimes are normaliz
 are never touched. PAX archives preserve nanoseconds and restore matching
 `build_dir/host`, `build_dir/toolchain-*`, `staging_dir/host` and
 `staging_dir/toolchain-*` together after clearing old build/staging trees.
+
+## Independent compiler bootstrap
+
+`tb-v1-ubi2-` is an exact, optional companion to the existing toolchain cache.
+It is queried only after an exact toolchain miss. A hit restores the paired
+host build/staging snapshot and still runs `make tools/ccache/compile`; GNU make,
+not a manually touched stamp, decides whether work is needed. A cold snapshot
+is packed immediately after that target and **before world**, because later
+package recipes can write to `staging_dir/host`. Never seed it from a completed
+world tree or merge it with a mismatched cross-toolchain.
+
+The bootstrap key keeps the entire final `.config`, builder identity, host
+architecture and absolute build path. Independent reuse requires the audited
+post-customization tools/scripts/framework input inventory. Unknown framework
+content falls back conservatively to compatibility tied to the full toolchain
+key; there is no all-package CONFIG projection or prefix restore. Kernel and
+runtime changes can preserve bootstrap only while those audited consumers,
+configuration and environment remain unchanged.
+
+The bootstrap compressed cap is 1,000,000,000 bytes within the existing
+10,000,000,000-byte repository budget. Admission counts all old/new generations
+and wrapper margin. Confirm a nonempty current-ref upload before pruning its
+own old prefix. Compiler → toolchain → bootstrap → download sequencing keeps
+unconfirmed uploads from admitting another tier. Denied admission retains old
+seeds; this is not a guarantee that every tier at its maximum can roll over.
+
+Diagnostics emit one `cache-inputs sha256/16` line from the same serialized
+records as the unchanged toolchain key, without a second source scan. Compile
+logs separately time bootstrap and world, including their failure exit status.
+
+Tests exercise actual YAML shell with build/API boundaries stubbed and native
+PAX archive operations without compilation. Fixture scripts are not proof of
+restored CMake/GCC execution or measured CI acceleration. Production archive
+size, stamp reuse and net wall-time savings require a separately authorized
+real build; do not promise a fixed duration.
 
 ## Reproduce
 
@@ -64,14 +100,14 @@ It modifies the supplied disposable tree. Empty toolchain layout fixtures are
 
 ## Download capacity regression
 
-Download packing and admission both allow exactly **3,000,000,000 bytes**.
+Download packing and admission both allow exactly **3,200,000,000 bytes**.
 The 10,000,000,000-byte repository budget, 64 MiB minimum wrapper margin,
 keys and save → confirmation → old-generation pruning remain unchanged.
 `test_cache_helper.py` replays the saved paginated inventories in
 `fixtures/download-cache-inventory.json`, measured 2.403/2.356 GB outputs,
-sparse cap/cap+1 and 3 GB old/new coexistence with the measured other tiers.
+sparse cap/cap+1 and old/new coexistence with the measured other tiers.
 Every replacement is rejected when all tiers already occupy their maxima;
-3 GB per download archive does not guarantee unlimited rollover headroom.
+The per-download cap does not guarantee unlimited rollover headroom.
 Compression alone is stubbed for size tests; these are not speed benchmarks.
 
 ## Compression choice

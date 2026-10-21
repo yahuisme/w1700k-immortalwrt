@@ -80,8 +80,11 @@ export -f sudo nproc make python3 docker_exec
                            GITHUB_OUTPUT=str(base / 'output'), GITHUB_SHA='a' * 40,
                            GITHUB_REPOSITORY='fixture/repo', LOG=str(base / 'calls'),
                            IMAGE_ID='sha256:'+'a'*64, BUILDER_FINGERPRINT='b'*64,
+                           BOOTSTRAP_KEY='tb-v1-ubi2-new',
                            PATH=str(base / 'bin') + ':' + os.environ['PATH'], FAULT=fault)
-                values = {'steps.tc.outputs.cache-hit': 'false'}
+                values = {'steps.tc.outputs.cache-hit': 'false',
+                          'steps.tb.outputs.cache-hit': 'false',
+                          'steps.tb_inputs.outputs.key': 'tb-v1-ubi2-new'}
                 successful = True
                 cancelled = fault == 'cancel_before_compile'
                 executed, saved, outcomes = [], [], {}
@@ -133,7 +136,7 @@ export -f sudo nproc make python3 docker_exec
                 calls = (base / 'calls').read_text() if (base / 'calls').exists() else ''
                 self.assertEqual('release create' in calls, should_publish)
                 if not fault or fault == publish['name']:
-                    self.assertEqual(saved, ['ccarchive', 'tcarchive', 'dlarchive'])
+                    self.assertEqual(saved, ['ccarchive', 'tcarchive', 'tbarchive', 'dlarchive'])
                 if fault in [s['name'] for s in cache_tail]:
                     self.assertEqual(outcomes[fault], 'failure')
                     self.assertEqual(outcomes[publish['name']], 'success')

@@ -37,7 +37,7 @@ jobs:
       with: {path: dlarchive, key: 'dl-v3.${{ github.run_id }}.${{ github.run_attempt }}', restore-keys: 'dl-v3.'}
     - name: Prepare build environment
       run: |
-        mkdir -p build-record openwrt_bin ghcache dlcache tcarchive ccarchive dlarchive
+        mkdir -p build-record openwrt_bin ghcache dlcache tcarchive ccarchive dlarchive tbarchive
         if [ -f ccarchive/ccache.tar.gz ]; then tar --gzip -xf ccarchive/ccache.tar.gz -C ghcache; fi
         if [ -f dlarchive/dl.tar.gz ]; then tar --gzip -xf dlarchive/dl.tar.gz -C dlcache; fi
         sudo python3 scripts/dlcache.py snapshot dlcache "$RUNNER_TEMP/dlcache-before.json"
@@ -49,7 +49,7 @@ jobs:
         IMAGE_ID=$(docker image inspect --format "{{.Id}}" "$IMAGE")
         [[ "$IMAGE_ID" =~ ^sha256:[0-9a-f]{64}$ ]]
         echo "IMAGE_ID=$IMAGE_ID" >> "$GITHUB_ENV"
-        docker run -d --name DK -v "$PWD/build-record:/build-record" -v "$PWD/user:$DK_USER" -v "$PWD/openwrt_bin:$DK_BIN" -v "$PWD/ghcache:/ghcache" -v "$PWD/scripts:/cache-scripts:ro" -v "$PWD/docker:/builder-context:ro" -v "$PWD/tcarchive:/tcarchive" -v "$PWD/ccarchive:/ccarchive" -v "$PWD/dlarchive:/dlarchive" -v "$PWD/dlcache:/dlcache" "$IMAGE_ID" sleep infinity
+        docker run -d --name DK -v "$PWD/build-record:/build-record" -v "$PWD/user:$DK_USER" -v "$PWD/openwrt_bin:$DK_BIN" -v "$PWD/ghcache:/ghcache" -v "$PWD/scripts:/cache-scripts:ro" -v "$PWD/docker:/builder-context:ro" -v "$PWD/tcarchive:/tcarchive" -v "$PWD/tbarchive:/tbarchive" -v "$PWD/ccarchive:/ccarchive" -v "$PWD/dlarchive:/dlarchive" -v "$PWD/dlcache:/dlcache" "$IMAGE_ID" sleep infinity
         BUILDER_FINGERPRINT=$(docker exec -u 0 DK python3 /cache-scripts/builder_fingerprint.py /builder-context)
         [[ "$BUILDER_FINGERPRINT" =~ ^[0-9a-f]{64}$ ]]
         echo "BUILDER_FINGERPRINT=$BUILDER_FINGERPRINT" >> "$GITHUB_ENV"
@@ -113,18 +113,62 @@ jobs:
     - name: Extract toolchain cache
       run: docker_exec DK python3 /cache-scripts/cache.py restore "$DK_OPENWRT" /tcarchive '${{ steps.inputs.outputs.key }}'
 
+    - name: Prepare bootstrap cache key
+      id: tb_inputs
+      if: steps.tc.outputs.cache-hit != 'true'
+      env:
+        TOOLCHAIN_KEY: ${{ steps.inputs.outputs.key }}
+      run: |
+        KEY=$(docker_exec DK python3 /cache-scripts/bootstrap_cache.py key "$DK_OPENWRT" /tbarchive "$BUILDER_FINGERPRINT" "$TOOLCHAIN_KEY")
+        [[ "$KEY" =~ ^[0-9a-f]{64}$ ]]
+        echo "key=tb-v1-ubi2-$KEY" >> "$GITHUB_OUTPUT"
+    - name: Restore compiler bootstrap
+      id: tb
+      if: steps.tc.outputs.cache-hit != 'true'
+      uses: actions/cache/restore@v6
+      with:
+        path: tbarchive
+        key: ${{ steps.tb_inputs.outputs.key }}
+        # Bootstrap is exact too; never restore an arbitrary older tools tree.
+    - name: Extract compiler bootstrap
+      if: steps.tc.outputs.cache-hit != 'true'
+      env:
+        BOOTSTRAP_KEY: ${{ steps.tb_inputs.outputs.key }}
+      run: docker_exec DK python3 /cache-scripts/bootstrap_cache.py restore "$DK_OPENWRT" /tbarchive "$BOOTSTRAP_KEY"
+
     - name: Compile firmware
+      env:
+        BOOTSTRAP_KEY: ${{ steps.tb_inputs.outputs.key }}
+        BOOTSTRAP_RECHECK: ${{ steps.tc.outputs.cache-hit != 'true' }}
+        BOOTSTRAP_SAVE: ${{ steps.tc.outputs.cache-hit != 'true' && steps.tb.outputs.cache-hit != 'true' }}
       run: |
         # Variables expand inside the container, not on the runner.
         # shellcheck disable=SC2016
-        docker_exec DK bash -e -c '
+        docker_exec DK env BOOTSTRAP_KEY="${BOOTSTRAP_KEY:-}" BOOTSTRAP_RECHECK="${BOOTSTRAP_RECHECK:-false}" BOOTSTRAP_SAVE="${BOOTSTRAP_SAVE:-false}" bash -e -c '
           cd $DK_OPENWRT
           export FORCE_UNSAFE_CONFIGURE=1 CCACHE_MAXSIZE=3G CCACHE_NOHASHDIR=true CCACHE_COMPILERCHECK=content
           CCACHE=staging_dir/host/bin/ccache
-          [ -x "$CCACHE" ] || make tools/ccache/compile -j$(($(nproc) + 1))
+          started=$SECONDS
+          status=0
+          if [ "$BOOTSTRAP_RECHECK" = true ] || [ ! -x "$CCACHE" ]; then
+            make tools/ccache/compile -j$(($(nproc) + 1)) || status=$?
+          fi
+          printf "Build timing: bootstrap=%ss status=%s\n" "$((SECONDS - started))" "$status"
+          [ "$status" = 0 ] || exit "$status"
+          # Snapshot before world: packages may later write to staging_dir/host.
+          if [ "$BOOTSTRAP_SAVE" = true ]; then
+            if ! python3 /cache-scripts/bootstrap_cache.py pack "$DK_OPENWRT" /tbarchive "$BOOTSTRAP_KEY"; then
+              rm -f /tbarchive/bootstrap.tar.gz /tbarchive/key
+              echo "::warning::Bootstrap snapshot unavailable; firmware compilation continues."
+            fi
+          fi
           $CCACHE -d /ghcache --zero-stats
           trap "$CCACHE -d /ghcache -sz ||:" EXIT
-          make -j$(($(nproc) + 1)) || make -j1 V=s
+          started=$SECONDS
+          status=0
+          make -j$(($(nproc) + 1)) || make -j1 V=s || status=$?
+          printf "Build timing: world=%ss status=%s\n" "$((SECONDS - started))" "$status"
+          exit "$status"
         '
 
     # Go can add dl/go-mod-cache entries during compilation, after make download.
@@ -192,6 +236,23 @@ jobs:
     - name: Prune old toolchain caches
       if: steps.tc_budget.outputs.save == 'true'
       run: python3 scripts/cache_helper.py cleanup 'tc-v3-ubi2-' '${{ steps.inputs.outputs.key }}'
+    - name: Check bootstrap cache budget
+      id: tb_budget
+      if: steps.tc.outputs.cache-hit != 'true' && steps.tb.outputs.cache-hit != 'true' && hashFiles('tbarchive/bootstrap.tar.gz') != ''
+      env:
+        BOOTSTRAP_KEY: ${{ steps.tb_inputs.outputs.key }}
+      run: |
+        sudo chown -R "$(id -u):$(id -g)" tbarchive
+        python3 scripts/cache_helper.py admit 'tb-v1-ubi2-' tbarchive/bootstrap.tar.gz "$BOOTSTRAP_KEY"
+    - name: Save compiler bootstrap
+      uses: actions/cache/save@v6
+      if: steps.tb_budget.outputs.save == 'true' && hashFiles('tbarchive/bootstrap.tar.gz') != ''
+      with: {path: tbarchive, key: '${{ steps.tb_inputs.outputs.key }}'}
+    - name: Prune old bootstrap caches
+      if: steps.tb_budget.outputs.save == 'true'
+      env:
+        BOOTSTRAP_KEY: ${{ steps.tb_inputs.outputs.key }}
+      run: python3 scripts/cache_helper.py cleanup 'tb-v1-ubi2-' "$BOOTSTRAP_KEY"
     - name: Check download cache budget
       id: dl_budget
       if: steps.dl_changed.outputs.save == 'true'

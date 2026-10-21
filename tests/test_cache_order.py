@@ -20,7 +20,7 @@ REAL = [entry(1, 'tc-v3-ubi2-a8b702', 1564072318),
 
 class CacheOrderTests(unittest.TestCase):
     def run_tail(self, entries, warm=False, cc=535453831,
-                 tc=1575367741, fault='', fail_reads=(), delay=0, dl=100):
+                 tc=1575367741, fault='', fail_reads=(), delay=0, dl=100, tb=None):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
             (base / 'scripts').symlink_to(ROOT / 'scripts')
@@ -34,8 +34,9 @@ class CacheOrderTests(unittest.TestCase):
     entries = s['entries']""")
             (base / 'gh').write_text(gh)
             (base / 'gh').chmod(0o755)
-            paths = {'cc': 'ccarchive/ccache.tar.gz', 'tc': 'tcarchive/toolchain.tar.gz', 'dl': 'dlarchive/dl.tar.gz'}
-            for kind, size in [('cc', cc), ('tc', tc), ('dl', dl)]:
+            paths = {'cc': 'ccarchive/ccache.tar.gz', 'tc': 'tcarchive/toolchain.tar.gz',
+                     'dl': 'dlarchive/dl.tar.gz', 'tb': 'tbarchive/bootstrap.tar.gz'}
+            for kind, size in [('cc', cc), ('tc', tc), ('dl', dl), ('tb', tb)]:
                 p = base / paths[kind]
                 p.parent.mkdir()
                 if size is not None:
@@ -45,7 +46,9 @@ class CacheOrderTests(unittest.TestCase):
                       'steps.inputs.outputs.key': 'tc-v3-ubi2-new',
                       'steps.gh.outputs.cache-primary-key': 'cc-v3-ubi2.new',
                       'steps.dl.outputs.cache-primary-key': 'dl-v3.new',
-                      'steps.dl_changed.outputs.save': 'true'}
+                      'steps.dl_changed.outputs.save': 'true',
+                      'steps.tb.outputs.cache-hit': 'false',
+                      'steps.tb_inputs.outputs.key': 'tb-v1-ubi2-new'}
             env = dict(os.environ, PATH=tmp + os.pathsep + os.environ['PATH'],
                        MOCK_STATE=str(state), GITHUB_REF='refs/heads/main', GITHUB_OUTPUT=str(base / 'output'))
             def resolve(expr):
@@ -69,7 +72,9 @@ class CacheOrderTests(unittest.TestCase):
                     text = re.sub(r'\$\{\{\s*(.*?)\s*\}\}', lambda m: resolve(m[1]), step['run'])
                     # Archives are sparse fixtures; run the real admission/cleanup.
                     text = 'docker_exec() { :; }; sudo() { :; };\n' + text
-                    result = subprocess.run(['bash', '-eo', 'pipefail', '-c', text], cwd=base, env=env, text=True, capture_output=True)
+                    step_env = dict(env, **{k: re.sub(r'\$\{\{\s*(.*?)\s*\}\}', lambda m: resolve(m[1]), v)
+                                            for k, v in step.get('env', {}).items()})
+                    result = subprocess.run(['bash', '-eo', 'pipefail', '-c', text], cwd=base, env=step_env, text=True, capture_output=True)
                     logs.append(step['name'] + '\n' + result.stdout + result.stderr)
                     successful = result.returncode == 0
                     if step.get('id') and (base / 'output').exists():
@@ -86,7 +91,9 @@ class CacheOrderTests(unittest.TestCase):
                         continue
                     s = json.loads(state.read_text())
                     if fault != 'warning':
-                        size = (535186562 if cc == 535453831 else cc) if kind == 'cc' else tc if kind == 'tc' else dl
+                        size = ((535186562 if cc == 535453831 else cc) if kind == 'cc'
+                                else tc if kind == 'tc' else tb if kind == 'tb' else dl)
+                        assert size is not None
                         new = entry(100 + len(saves), key, size)
                         if fault == 'zero': new['size_in_bytes'] = 0
                         if fault == 'wrong_ref': new['ref'] = 'refs/heads/other'
@@ -96,6 +103,24 @@ class CacheOrderTests(unittest.TestCase):
                             s['entries'].append(new)
                     state.write_text(json.dumps(s))
             return saves, json.loads(state.read_text()), '\n'.join(logs)
+
+    def test_bootstrap_tail_saves_and_confirms_before_download(self):
+        entries = [entry(1, 'tc-v3-ubi2-old', 1566625575),
+                   entry(2, 'cc-v3-ubi2.old', 1110777262),
+                   entry(3, 'dl-v3.old', 3073244832),
+                   entry(4, 'tb-v1-ubi2-old', 900000000)]
+        saves, state, log = self.run_tail(entries, cc=1110777262, tc=1566625575,
+                                          dl=3073244832, tb=900000000)
+        self.assertEqual(saves, ['cc', 'tc', 'tb', 'dl'], log)
+        self.assertEqual({e['key'] for e in state['entries']},
+                         {'cc-v3-ubi2.new', 'tc-v3-ubi2-new', 'tb-v1-ubi2-new', 'dl-v3.new'})
+        for fault in ('warning', 'wrong_ref', 'zero', 'action_failure'):
+            with self.subTest(fault=fault):
+                saves, state, log = self.run_tail(entries, warm=False, cc=None, tc=None,
+                                                  dl=100, tb=900000000, fault=fault)
+                self.assertEqual(saves, ['tb'], log)
+                self.assertNotIn('Check download cache budget', log)
+                self.assertTrue({1, 2, 3, 4} <= {e['id'] for e in state['entries']})
 
     def test_measured_download_tail_preserves_retired_oc(self):
         # Historical OC entries still count toward the standard writer's budget.

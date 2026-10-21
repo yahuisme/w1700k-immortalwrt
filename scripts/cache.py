@@ -27,12 +27,33 @@ INPUTS = ('tools', 'toolchain', 'include', 'scripts', 'config', 'target/linux/ge
 LIMITS = {'toolchain': 2_000_000_000, 'ccache': 3_000_000_000, 'dl': 3_200_000_000}
 
 
+def key_policy_source():
+    """Exclude only diagnostic plumbing, retaining the exact pre-diagnostic policy.
+
+    All input selection, serialization and safety checks remain self-fingerprinted.
+    Keep these narrowly matched replacements in sync with the marked statements;
+    a frozen legacy-helper regression checks the resulting source byte for byte.
+    """
+    source = ''.join(line for line in inspect.getsource(key).splitlines(keepends=True)
+                     if not line.endswith('  # cache diagnostic\n'))
+    return source.replace('key_policy_source()', 'inspect.getsource(key)').replace(
+        '(record := json.dumps([name, modes[name], hashlib.sha256(data).hexdigest()]).encode())',
+        'json.dumps([name, modes[name], hashlib.sha256(data).hexdigest()]).encode()')
+
+
+def record_input_group(groups, name, record):
+    # Consume the exact bytes already sent to the full key, in the same order.
+    group = next(base for base in INPUTS if name == base or name.startswith(base + '/'))
+    groups[group].update(record)
+
+
 def key(root, builder):
     # Full final configuration and source; no historical projection or fallback.
     # Archive/upload edits do not participate in the compatibility policy.
     digest = hashlib.sha256(json.dumps(['tc-inputs-v8', builder, os.uname().machine,
                                       str(root), EPOCH, INPUTS,
-                                      inspect.getsource(key)]).encode())
+                                      key_policy_source()]).encode())
+    groups = {'environment': digest.copy(), **{name: hashlib.sha256() for name in INPUTS}}  # cache diagnostic
     if not (root / '.config').is_file():
         raise ValueError('missing input: .config')
     config = (root / '.config').read_text()
@@ -98,7 +119,9 @@ def key(root, builder):
                 modes[str(rel)] = p.stat().st_mode
                 os.utime(p, (EPOCH, EPOCH))
     for name, data in sorted(files.items()):
-        digest.update(json.dumps([name, modes[name], hashlib.sha256(data).hexdigest()]).encode())
+        digest.update((record := json.dumps([name, modes[name], hashlib.sha256(data).hexdigest()]).encode()))
+        record_input_group(groups, name, record)  # cache diagnostic
+    print('cache-inputs sha256/16 ' + ' '.join(f'{name}={value.hexdigest()[:16]}' for name, value in groups.items()), file=sys.stderr)  # cache diagnostic
     return digest.hexdigest()
 
 
