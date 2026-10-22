@@ -319,14 +319,14 @@ jobs:
         # Recheck before pruning, before removing older standard releases.
         current_main
         PREFIX="W1700K-ImmortalWrt-"
-        # Keep the current release plus the most recently published predecessor.
+        # Keep only the current release; older production releases are removed.
         if releases=$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100") &&
           old_tags=$(jq -er --arg current "$VERSION" --arg pattern "^(${PREFIX}r[0-9]+-|W1700K-ImmortalWrt_|W1700K-ubi2[-_])" '
             flatten | map(select(.draft == false and .prerelease == false and
               (.tag_name | test($pattern)))) |
             sort_by(.published_at, .id) | reverse |
             if any(.tag_name == $current) then
-              [.[] | select(.tag_name != $current)][1:] | map(.tag_name) | join("\n")
+              [.[] | select(.tag_name != $current)] | map(.tag_name) | join("\n")
             else error("Published release missing from inventory") end
           ' <<< "$releases"); then
           while IFS= read -r tag; do
