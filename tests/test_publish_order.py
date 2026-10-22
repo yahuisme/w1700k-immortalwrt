@@ -6,7 +6,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
-from test_cache_workflow import STEPS, step, render
+from test_cache_workflow import STEPS, step, render, render_env
 import test_release_safety as release
 from test_cache_workflow import ROOT
 from test_cache_helper import GH, entry
@@ -34,7 +34,7 @@ class PublishOrderTests(unittest.TestCase):
         self.assertLess(STEPS.index(stage), STEPS.index(cache_tail[0]))
         self.assertLess(STEPS.index(cache_tail[-1]), STEPS.index(publish))
         self.assertEqual(publish['env'], {'GH_TOKEN': '${{ secrets.RELEASE_TOKEN }}'})
-        cases = ['', 'Compile firmware', stage['name'], publish['name'], 'cancel_before_compile',
+        cases = ['', 'Download sources', 'Compile firmware', stage['name'], publish['name'], 'cancel_before_compile',
                  'cancel_after_stage', 'Collect build record', 'Upload build record'] + [s['name'] for s in cache_tail]
         for fault in cases:
             with self.subTest(fault=fault), tempfile.TemporaryDirectory() as tmp:
@@ -64,7 +64,8 @@ esac
                 stubs = '''
 sudo() { if [ "$1" = python3 ]; then "$@"; fi; }
 nproc() { printf '1\\n'; }
-make() { [ "$FAULT" != 'Compile firmware' ]; }
+make() { if [ "$1" = download ]; then [ "$FAULT" != 'Download sources' ]; else [ "$FAULT" != 'Compile firmware' ]; fi; }
+git() { [ "$*" = 'config --global tar.umask 0022' ]; }
 python3() {
   [ "$STEP_NAME" != "$FAULT" ] || return 23
   if [ "$2" = admit ]; then printf 'save=true\\n' >> "$GITHUB_OUTPUT"; else printf 'save=true\\n'; fi
@@ -74,7 +75,7 @@ docker_exec() {
   [ "$STEP_NAME" != 'Prepare build caches' ] || [ "$FAULT" != "$STEP_NAME" ] || return 23
   "$@"
 }
-export -f sudo nproc make python3 docker_exec
+export -f sudo nproc make python3 docker_exec git
 '''
                 env = dict(os.environ, DK_OPENWRT=tmp, RUNNER_TEMP=tmp,
                            GITHUB_OUTPUT=str(base / 'output'), GITHUB_SHA='a' * 40,
@@ -82,13 +83,14 @@ export -f sudo nproc make python3 docker_exec
                            IMAGE_ID='sha256:'+'a'*64, BUILDER_FINGERPRINT='b'*64,
                            BOOTSTRAP_KEY='tb-v1-ubi2-new',
                            PATH=str(base / 'bin') + ':' + os.environ['PATH'], FAULT=fault)
-                values = {'steps.tc.outputs.cache-hit': 'false',
+                values = {'secrets.RELEASE_TOKEN': 'fixture-token',
+                          'steps.tc.outputs.cache-hit': 'false',
                           'steps.tb.outputs.cache-hit': 'false',
                           'steps.tb_inputs.outputs.key': 'tb-v1-ubi2-new'}
                 successful = True
                 cancelled = fault == 'cancel_before_compile'
                 executed, saved, outcomes = [], [], {}
-                for current in STEPS[STEPS.index(step('Compile firmware')):]:
+                for current in STEPS[STEPS.index(step('Download sources')):]:
                     # Evaluate the real if expression, including GitHub's implicit
                     # success() when no status function appears. No copied gate.
                     expr = current.get('if', 'True').removeprefix('${{').removesuffix('}}').strip()
@@ -111,7 +113,7 @@ export -f sudo nproc make python3 docker_exec
                         if 'run' in current:
                             result = subprocess.run(['bash', '-eo', 'pipefail', '-c',
                                                      stubs + render(current['run'], values)],
-                                                    cwd=base, env=dict(env, STEP_NAME=name),
+                                                    cwd=base, env=dict(env, STEP_NAME=name, **render_env(current, values)),
                                                     text=True, capture_output=True)
                             outcome = 'success' if result.returncode == 0 else 'failure'
                             if current.get('id') and (base / 'output').exists():
@@ -130,7 +132,7 @@ export -f sudo nproc make python3 docker_exec
                         values[f"steps.{current['id']}.outcome"] = outcome
                     if name == stage['name'] and fault == 'cancel_after_stage':
                         cancelled = True
-                should_publish = fault not in ('Compile firmware', stage['name'],
+                should_publish = fault not in ('Download sources', 'Compile firmware', stage['name'],
                                                'cancel_before_compile', 'cancel_after_stage')
                 self.assertEqual(publish['name'] in executed, should_publish, (fault, outcomes))
                 calls = (base / 'calls').read_text() if (base / 'calls').exists() else ''
@@ -157,7 +159,7 @@ class CachePublicationIntegrationTests(unittest.TestCase):
             self.assertNotRegex(item.get('if', ''), r'\b(always|failure|cancelled)\(')
             self.assertFalse(item.get('continue-on-error', False))
 
-    def replay(self, fault):
+    def replay(self, fault, tc_hit='false', tb_hit='true'):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
             release.ReleaseTests().fixture(base)
@@ -199,7 +201,8 @@ elif a == ['api', '--paginate'""")
             # Real nested compile shell and stage; compiler, Docker and archive
             # compressor are external boundaries. No firmware build/network occurs.
             prefix = '''
-make() { [ "$FAULT" != compile ]; }
+make() { if [ "$1" = download ]; then [ "$FAULT" != download ]; else [ "$FAULT" != compile ]; fi; }
+git() { [ "$*" = 'config --global tar.umask 0022' ]; }
 docker_exec() {
     shift
     if [ "$1" = python3 ] && [ "$2" = /cache-scripts/build_record.py ]; then
@@ -213,13 +216,16 @@ docker_exec() {
     fi
 }
 sudo() { "$@"; }
-export -f make docker_exec sudo
+export -f make docker_exec sudo git
 '''
             subprocess.run(['python3', str(ROOT/'scripts/dlcache.py'), 'snapshot',
                             str(base/'dlcache'), str(base/'dlcache-before.json')], check=True,
                            capture_output=True)
             (base/'dlcache/new-download').write_bytes(b'fixture download')
-            values = {'steps.tc.outputs.cache-hit': 'false',
+            values = {'secrets.RELEASE_TOKEN': 'fixture-token',
+                      'steps.tc.outputs.cache-hit': tc_hit,
+                      'steps.tb.outputs.cache-hit': tb_hit,
+                      'steps.tb_inputs.outputs.key': 'tb-v1-ubi2-new',
                       'steps.inputs.outputs.key': 'tc-v3-ubi2-new',
                       'steps.gh.outputs.cache-primary-key': 'cc-v3-ubi2.new',
                       'steps.dl.outputs.cache-primary-key': 'dl-v3.new',
@@ -241,7 +247,7 @@ export -f make docker_exec sudo
                 # Only trusted repository comparisons and repr-quoted local
                 # fixture values are evaluated, never external/event input.
                 return eval(expression.replace('&&', ' and '), {'__builtins__': {}})
-            for item in STEPS[STEPS.index(step('Compile firmware')):]:
+            for item in STEPS[STEPS.index(step('Download sources')):]:
                 name = item['name']
                 if fault == 'cancel' and name == 'Prepare build caches':
                     cancelled = True
@@ -251,7 +257,7 @@ export -f make docker_exec sudo
                 executed.append(name)
                 if 'run' in item:
                     result = subprocess.run(['bash', '-eo', 'pipefail', '-c', prefix + render(item['run'], values)],
-                                            cwd=base, env=env, text=True, capture_output=True)
+                                            cwd=base, env=dict(env, **render_env(item, values)), text=True, capture_output=True)
                     rc = result.returncode
                     logs.append(name + '\n' + result.stdout + result.stderr)
                 else:
@@ -275,11 +281,26 @@ export -f make docker_exec sudo
                 successful = successful and rc == 0
             return outcomes, executed, json.loads(state.read_text()), '\n'.join(logs)
 
+    def test_download_failure_never_compiles_stages_or_publishes(self):
+        for tc, tb in (('true', ''), ('false', 'true'), ('false', 'false')):
+            with self.subTest(tc=tc, tb=tb):
+                outcomes, _, inventory, log = self.replay('download', tc_hit=tc, tb_hit=tb)
+                self.assertEqual(outcomes['Download sources'], 'failure', log)
+                for name in ('Compile firmware', 'Validate and stage firmware',
+                             'Publish firmware and prune releases'):
+                    self.assertEqual(outcomes[name], 'skipped', log)
+                self.assertFalse(any(call[:2] == ['release', 'create']
+                                     for call in inventory['calls']), log)
+
     def test_full_compile_stage_cache_publish_failure_matrix(self):
-        for fault in ('none', 'compile', 'validation', 'cancel', 'package', 'save', 'readback', 'publish', 'metadata', 'upload'):
+        for fault in ('none', 'download', 'compile', 'validation', 'cancel', 'package', 'save', 'readback', 'publish', 'metadata', 'upload'):
             with self.subTest(fault=fault):
                 outcomes, executed, inventory, log = self.replay(fault)
-                published = fault not in ('compile', 'validation', 'cancel')
+                published = fault not in ('download', 'compile', 'validation', 'cancel')
+                if fault == 'download':
+                    self.assertEqual(outcomes['Download sources'], 'failure', log)
+                    self.assertEqual(outcomes['Compile firmware'], 'skipped', log)
+                    self.assertEqual(outcomes['Validate and stage firmware'], 'skipped', log)
                 creates = [call for call in inventory['calls'] if call[:2] == ['release', 'create']]
                 self.assertEqual(bool(creates), published, log)
                 self.assertEqual(outcomes['Publish firmware and prune releases'],

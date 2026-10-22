@@ -69,6 +69,6 @@ export -f docker_exec git mountpoint make
             self.assertEqual((copied/'config.diff').read_bytes(), original['config.diff'])
             calls = (base/'calls').read_text()
             self.assertLess(calls.index('custom\n'), calls.index('make defconfig'))
-            self.assertIn('make download -j8', calls)
+            self.assertNotIn('make download', calls)
             self.assertEqual((base/'output').read_text(), 'key=tc-v3-ubi2-fixture-key\n')
         self.assertEqual({str(p.relative_to(profile)): p.read_bytes() for p in profile.rglob('*') if p.is_file()}, original)

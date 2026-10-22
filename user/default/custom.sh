@@ -13,6 +13,22 @@ sed -i -e 's/PRETTY_NAME="%D %V"/PRETTY_NAME="%D %C"/' \
        package/base-files/files/usr/lib/os-release
 
 # -------------------------------------------------
+# Keep native reset/upgrade reconnect defaults aligned with 99-w1700k-defaults.
+FLASH_JS="feeds/luci/modules/luci-mod-system/htdocs/luci-static/resources/view/system/flash.js"
+if [ ! -f "$FLASH_JS" ]; then
+    echo "ERROR: LuCI flash.js not found" >&2
+    exit 1
+fi
+FLASH_OLD=$(grep -oF "'192.168.1.1'" "$FLASH_JS" | wc -l)
+FLASH_NEW=$(grep -oF "'192.168.8.1'" "$FLASH_JS" | wc -l)
+if [ "$FLASH_OLD:$FLASH_NEW" != "3:0" ] && [ "$FLASH_OLD:$FLASH_NEW" != "0:3" ]; then
+    echo "ERROR: LuCI reconnect defaults changed; review flash.js" >&2
+    exit 1
+fi
+sed -i "s/'192\.168\.1\.1'/'192.168.8.1'/g" "$FLASH_JS"
+[ "$(grep -oF "'192.168.8.1'" "$FLASH_JS" | wc -l)" -eq 3 ] || exit 1
+
+# -------------------------------------------------
 # Fetch W1700K LuCI apps from user's packages repo
 # -------------------------------------------------
 # luci-app-wifi7 / luci-app-airoha-npu /

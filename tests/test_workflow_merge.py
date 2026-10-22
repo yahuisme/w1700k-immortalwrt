@@ -46,7 +46,7 @@ python3() {
 
 class WorkflowMergeTests(unittest.TestCase):
     def test_step_boundaries_and_failure_policy(self):
-        self.assertEqual(len(STEPS), 28)
+        self.assertEqual(len({s['name'] for s in STEPS}), len(STEPS))
         for name in ('Prepare build environment', 'Prepare build caches'):
             merged = step(name)
             self.assertNotIn('if', merged)

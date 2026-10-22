@@ -21,6 +21,21 @@ def render(text, values):
     return re.sub(r'\$\{\{\s*(.*?)\s*\}\}', lambda m: values.get(m[1], 'fixture'), text)
 
 
+def render_env(item, values):
+    """Render this workflow's trusted boolean/string env expressions only."""
+    def value(match):
+        expression = match[1].strip()
+        if expression in values:
+            return values[expression]
+        expression = re.sub(r'steps\.[\w.-]+', lambda m: repr(values.get(m[0], '')), expression)
+        result = eval(expression.replace('&&', ' and '), {'__builtins__': {}})
+        if not isinstance(result, bool):
+            raise ValueError('unsupported workflow environment expression')
+        return str(result).lower()
+    return {name: re.sub(r'\$\{\{\s*(.*?)\s*\}\}', value, text)
+            for name, text in item.get('env', {}).items()}
+
+
 class WorkflowTests(unittest.TestCase):
     def test_compile_nested_block(self):
         block = step('Compile firmware')['run']
@@ -44,7 +59,11 @@ class WorkflowTests(unittest.TestCase):
                     cc.chmod(0o755)
                 env = dict(os.environ, DK_OPENWRT=tmp, LOG=str(base / 'calls'),
                            PRE=str(pre), MAIN=str(main), FALLBACK=str(fallback),
-                           STATS=str(stats), STUB=str(stub))
+                           STATS=str(stats), STUB=str(stub),
+                           **render_env(step('Compile firmware'), {
+                               'steps.tc.outputs.cache-hit': 'true' if hot else 'false',
+                               'steps.tb.outputs.cache-hit': 'true',
+                               'steps.tb_inputs.outputs.key': 'tb-fixture'}))
                 prefix = '''
                 docker_exec() { shift; "$@"; }
                 nproc() { printf '4\\n'; }
@@ -160,7 +179,8 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(len(names), len(set(names)))
         source = step('inputs')
         self.assertEqual(source['name'], 'Prepare source and cache key')
-        self.assertLess(source['run'].index('make download'), source['run'].index('KEY=$(docker_exec'))
+        self.assertNotIn('make download', source['run'])
+        self.assertLess(source['run'].index('make defconfig'), source['run'].index('KEY=$(docker_exec'))
         self.assertEqual(STEPS.index(step('tc')), STEPS.index(source) + 1)
 
     def test_source_key_success_and_failure(self):

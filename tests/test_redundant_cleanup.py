@@ -59,19 +59,23 @@ class RedundantCleanup(unittest.TestCase):
         libraries = re.findall(r'(/[^\s()]+)', subprocess.check_output(
             ['ldd', str(busybox)], text=True))
         config = ROOT / 'user/default/files/etc/sysctl.d'
-        states = []
-        for restore_duplicate in (True, False):
-            with tempfile.TemporaryDirectory() as tmp:
+        # Removed filter toggles must remain whatever the operator/kernel supplied.
+        # The remaining call_* and pass-vlan-input-dev settings still load normally.
+        for initial in ('0', '1'):
+            with self.subTest(initial=initial), tempfile.TemporaryDirectory() as tmp:
                 jail = Path(tmp)
                 for source in [str(busybox), *libraries]:
                     target = jail / source.lstrip('/')
                     target.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(source, target)
+                filters = ('bridge-nf-filter-vlan-tagged', 'bridge-nf-filter-pppoe-tagged')
+                for key in filters:
+                    node = jail / 'proc/sys/net/bridge' / key
+                    node.parent.mkdir(parents=True, exist_ok=True)
+                    node.write_text(initial + '\n')
                 files = []
                 for source in sorted(config.glob('*.conf')):
                     text = source.read_text()
-                    if restore_duplicate and source.name == '12-apmode-offload.conf':
-                        text += 'net.bridge.bridge-nf-filter-vlan-tagged=1\n'
                     target = jail / source.name
                     target.write_text(text)
                     files.append('/' + source.name)
@@ -80,15 +84,18 @@ class RedundantCleanup(unittest.TestCase):
                             key = line.split('=', 1)[0].strip()
                             node = jail / 'proc/sys' / key.replace('.', '/')
                             node.parent.mkdir(parents=True, exist_ok=True)
-                            node.write_text('0\n')
+                            if not node.exists():
+                                node.write_text('9\n')
                 for name in files:
                     result = subprocess.run([chroot, tmp, str(busybox), 'sysctl', '-p', name],
                                             capture_output=True, text=True)
                     self.assertEqual(result.returncode, 0, result.stderr)
-                states.append({str(p.relative_to(jail / 'proc/sys')): p.read_text()
-                               for p in (jail / 'proc/sys').rglob('*') if p.is_file()})
-        self.assertEqual(states[0], states[1])
-        self.assertEqual(states[1]['net/bridge/bridge-nf-filter-vlan-tagged'].strip(), '1')
+                bridge = jail / 'proc/sys/net/bridge'
+                for key in filters:
+                    self.assertEqual((bridge / key).read_text().strip(), initial)
+                for family in ('iptables', 'ip6tables', 'arptables'):
+                    self.assertEqual((bridge / ('bridge-nf-call-' + family)).read_text().strip(), '0')
+                self.assertEqual((bridge / 'bridge-nf-pass-vlan-input-dev').read_text().strip(), '1')
 
 
 if __name__ == '__main__':

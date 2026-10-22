@@ -68,8 +68,9 @@ class BuilderImageTests(unittest.TestCase):
 
     def test_llvm_guard_after_defconfig(self):
         inputs = next(s['run'] for s in STEPS if s.get('id') == 'inputs')
-        block = inputs[inputs.index('make defconfig'):inputs.index('make download') + len('make download -j8 || exit 1')]
-        stub = 'make() { if [ "$1" = defconfig ]; then printf "%s\\n" "$CONFIG" > .config; else touch downloaded; fi; };\n'
+        block = inputs[inputs.index('make defconfig'):inputs.index("\n'")]
+        block += "\ntouch prepared\n"
+        stub = 'make() { if [ "$1" = defconfig ]; then printf "%s\\n" "$CONFIG" > .config; fi; };\n'
         for config, allowed in (('CONFIG_USE_LLVM_HOST=y', False),
                                 ('CONFIG_BPF_TOOLCHAIN_BUILD_LLVM=y', True),
                                 ('# CONFIG_USE_LLVM is not set', True)):
@@ -77,7 +78,7 @@ class BuilderImageTests(unittest.TestCase):
                 result = subprocess.run(['bash', '-e', '-c', stub + block], cwd=tmp,
                                         env=dict(os.environ, CONFIG=config), capture_output=True, text=True)
                 self.assertEqual(result.returncode == 0, allowed, result.stderr)
-                self.assertEqual((Path(tmp) / 'downloaded').exists(), allowed)
+                self.assertEqual((Path(tmp) / 'prepared').exists(), allowed)
                 if not allowed:
                     self.assertIn('Host LLVM selected', result.stderr)
 

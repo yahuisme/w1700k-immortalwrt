@@ -99,7 +99,6 @@ jobs:
             echo "::error::Host LLVM selected: builder needs clang, llc, llvm-dis, opt and llvm-strip; review include/bpf.mk" >&2
             exit 1
           fi
-          make download -j8 || exit 1
         '
         KEY=$(docker_exec DK python3 /cache-scripts/cache.py key "$DK_OPENWRT" /tcarchive "$BUILDER_FINGERPRINT")
         echo "key=tc-v3-ubi2-$KEY" >> "$GITHUB_OUTPUT"
@@ -135,6 +134,15 @@ jobs:
       env:
         BOOTSTRAP_KEY: ${{ steps.tb_inputs.outputs.key }}
       run: docker_exec DK python3 /cache-scripts/bootstrap_cache.py restore "$DK_OPENWRT" /tbarchive "$BOOTSTRAP_KEY"
+
+    - name: Download sources
+      run: |
+        # Restore host tools before download; keep cold download work for compilation.
+        # shellcheck disable=SC2016
+        docker_exec DK bash -e -c '
+          cd $DK_OPENWRT
+          make download -j8 || exit 1
+        '
 
     - name: Compile firmware
       env:

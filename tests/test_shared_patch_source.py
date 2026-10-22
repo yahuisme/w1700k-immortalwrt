@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 import unittest
 from patch_source import PATCHES
+from test_device_runtime import FLASH_RUN, node
 
 ROOT = Path(__file__).resolve().parents[1]
 APPS = ('luci-app-wifi7', 'luci-app-airoha-npu', 'luci-app-airoha-flowsense', 'luci-app-airoha-fancontrol')
@@ -47,6 +48,13 @@ class SharedPatchSource(unittest.TestCase):
                 regdb.mkdir(parents=True)
                 for name in ('500-world.patch', '600-custom-change-txpower-and-dfs.patch', '700-keep.patch'):
                     (regdb / name).write_text(name)
+                # Real native view is a required customization input, not an
+                # isolated stub that could let the complete script fail early.
+                flash = Path(os.environ.get('DEVICE_FLASH_JS', source /
+                    'feeds/luci/modules/luci-mod-system/htdocs/luci-static/resources/view/system/flash.js'))
+                destination = work / 'feeds/luci/modules/luci-mod-system/htdocs/luci-static/resources/view/system/flash.js'
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(flash, destination)
                 # Source overlays use a directory copy: missing an individual
                 # required patch must not silently omit that behavior.
                 stub = '''git() {
@@ -72,6 +80,7 @@ export -f git
                 self.assertEqual(result.returncode == 0, missing is None, result.stdout + result.stderr)
                 self.assertEqual((base / 'calls').read_text(), 'packages\n')
                 if missing is None:
+                    node(FLASH_RUN, destination, '192.168.8.1')
                     self.assertFalse((regdb / '600-custom-change-txpower-and-dfs.patch').exists())
                     for name in ('500-world.patch', '700-keep.patch'):
                         self.assertEqual((regdb / name).read_text(), name)

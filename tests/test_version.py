@@ -42,7 +42,7 @@ class VersionTest(unittest.TestCase):
             cls.files[name] = run(["git", "show", "HEAD:package/base-files/files/" + name], cls.source)
         workflow = (REPO / ".github/workflows/W1700K.yaml").read_text()
         cls.fragment = textwrap.dedent(workflow.split("          make defconfig\n", 1)[1]
-                                      .split("          make download", 1)[0])
+                                      .split("        '", 1)[0])
         cls.tag = textwrap.dedent(workflow.split('        PREFIX="W1700K-ImmortalWrt_"', 1)[1]
                                  .split('        RELEASE_NOTES=', 1)[0])
         cls.tag = 'PREFIX="W1700K-ImmortalWrt_"\n' + cls.tag

@@ -52,7 +52,7 @@ return baseclass.extend({
 		}
 
 		function fan(d) {
-			if (d.fan_rpm == null || Number(d.fan_rpm) <= 0)
+			if (d.fan_rpm == null || !isFinite(Number(d.fan_rpm)) || Number(d.fan_rpm) < 0)
 				return '--';
 
 			return d.fan_rpm + ' RPM' +

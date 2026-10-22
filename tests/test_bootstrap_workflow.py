@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 import unittest
 import yaml
+from test_cache_workflow import render_env
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -33,7 +34,8 @@ class BootstrapWorkflowTests(unittest.TestCase):
         self.assertNotIn('bootstrap_cache.py pack', next(s['run'] for s in all_steps if s['name'] == 'Prepare build caches'))
 
     def test_production_compile_packs_before_world_and_rechecks_restored_stamps(self):
-        block = next(s['run'] for s in steps() if s['name'] == 'Compile firmware')
+        item = next(s for s in steps() if s['name'] == 'Compile firmware')
+        block = item['run']
         for recheck, save, pack_status, main_status in (
                 ('true', 'true', 0, 0), ('true', 'false', 0, 0),
                 ('false', 'false', 0, 0), ('true', 'true', 19, 0),
@@ -44,9 +46,11 @@ class BootstrapWorkflowTests(unittest.TestCase):
                 cc.parent.mkdir(parents=True)
                 cc.write_text('#!/bin/bash\nprintf "ccache %s\\n" "$*" >> "$LOG"\n')
                 cc.chmod(0o755)
-                env = dict(os.environ, DK_OPENWRT=tmp, LOG=str(root / 'calls'),
-                           BOOTSTRAP_RECHECK=recheck, BOOTSTRAP_SAVE=save,
-                           BOOTSTRAP_KEY='tb-v1-ubi2-test', PACK_STATUS=str(pack_status), MAIN_STATUS=str(main_status))
+                values = {'steps.tc.outputs.cache-hit': 'false' if recheck == 'true' else 'true',
+                          'steps.tb.outputs.cache-hit': 'false' if save == 'true' else 'true',
+                          'steps.tb_inputs.outputs.key': 'tb-v1-ubi2-test'}
+                env = dict(os.environ, **render_env(item, values), DK_OPENWRT=tmp,
+                           LOG=str(root / 'calls'), PACK_STATUS=str(pack_status), MAIN_STATUS=str(main_status))
                 prefix = '''
                 docker_exec() { shift; "$@"; }
                 make() {

@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 import unittest
 import yaml
+from test_cache_workflow import render_env
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -29,7 +30,12 @@ class BuildTimingTests(unittest.TestCase):
                     cc.write_bytes(stub.read_bytes())
                     cc.chmod(0o755)
                 env = dict(os.environ, DK_OPENWRT=tmp, PRE=str(pre), MAIN=str(main),
-                           FALLBACK=str(fallback), STATS=str(stats), STUB=str(stub))
+                           FALLBACK=str(fallback), STATS=str(stats), STUB=str(stub),
+                           **render_env(next(s for s in workflow['jobs']['build']['steps']
+                                             if s.get('name') == 'Compile firmware'), {
+                               'steps.tc.outputs.cache-hit': 'true' if hot else 'false',
+                               'steps.tb.outputs.cache-hit': 'true',
+                               'steps.tb_inputs.outputs.key': 'tb-fixture'}))
                 prefix = '''
                 docker_exec() { shift; "$@"; }
                 nproc() { printf '4\n'; }

@@ -1,41 +1,16 @@
-# ARM64 Debian builder
+# ARM64 构建环境
 
-The workflow builds this small context, inspects the local image ID and runs that
-exact ID with explicit `sleep infinity`. The image default is also sleep infinity.
-There are no preseeded source, staging or compiler caches. Root execution and all
-existing cache/profile/artifact mounts are preserved.
+工作流使用此目录构建 Debian ARM64 镜像，并按实际镜像 ID 启动容器。镜像不预装固件源码、工具链或编译缓存。
 
-Base: official Debian trixie-slim linux/arm64 platform manifest pinned in Dockerfile.
-Cache archives use pigz for parallel gzip; speed gains require CI measurement.
-Go: official go.dev ARM64 1.26.8 archive, SHA-256 verified before extraction to
-`/usr/lib/go`; this is the external bootstrap, not a replacement for feed-built Go.
-Apt packages deliberately receive official trixie security updates; see
-`tests/CACHE_KEY_REVIEW.md` for package/content identity rather than Docker build ID.
+- Debian 基础镜像摘要固定，apt 软件包正常接收官方更新。
+- Go 引导工具来自官方 ARM64 归档，校验 SHA256 后安装到 `/usr/lib/go`；最终 Go 编译器仍由 feed 构建。
+- 缓存使用 pigz 压缩；工具链兼容性由配方、实际软件包清单和构建输入共同判定。
+- 不提供主机 LLVM；最终配置选择 `CONFIG_USE_LLVM_HOST=y` 时停止构建，避免缺工具后继续执行。
 
-## LLVM boundary
+在空源码容器中运行以下命令可检查依赖、Go、Git 和归档操作，不执行编译：
 
-Official OpenWrt/ImmortalWrt `toolchain/Config.in` selects host LLVM only for
-`BPF_TOOLCHAIN_HOST`; the default is prebuilt where available, otherwise
-`BPF_TOOLCHAIN_BUILD_LLVM` (selects USE_LLVM_BUILD when NEED_BPF_TOOLCHAIN).
-`include/bpf.mk` host mode requires clang >=12 plus llc, llvm-dis, opt and
-llvm-strip, optionally under BPF_TOOLCHAIN_HOST_PATH. Installing clang alone
-would not satisfy it. This lean image does not install any of them.
+```sh
+bash /builder-context/smoke.sh
+```
 
-The local profile has no host-LLVM override. An existing prepared official
-ARM64 profile selected BPF_TOOLCHAIN_BUILD_LLVM, not host LLVM; that historical
-configuration is not proof of today's rolling feeds. The production workflow
-checks the actual final `.config` immediately after defconfig and stops before
-download if USE_LLVM_HOST=y. It does not silently change firmware configuration.
-If future input selects host LLVM, review the recipe and install/test the complete
-LLVM tool set before removing that gate. Full current configuration/compilation
-has deliberately not been run under the local no-compilation authorization.
-
-## Non-compiling smoke
-
-`bash /builder-context/smoke.sh` inside the image verifies empty source, commands,
-headers, Python/Perl modules, Go version/environment/tool versions, Git and archive
-primitives. It compiles no code and proves neither final compiler compatibility
-nor firmware/device correctness. `tests/test_builder_image.py` covers workflow
-failure boundaries and fingerprint invalidation; real-container evidence is kept
-outside the repository under `/root/cleanup-preserved/`; temporary project-tests
-directories and task-specific images are removed after validation.
+缓存输入与恢复约定见 [`tests/CACHE_KEY_REVIEW.md`](../tests/CACHE_KEY_REVIEW.md)。
