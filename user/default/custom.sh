@@ -5,12 +5,7 @@ set -e
 echo "=============================================="
 echo "Running custom commands"
 
-# Snapshot branding is display-only; keep version.mk and machine version fields.
-sed -i 's/%D %V, %C/%D %C/' package/base-files/files/etc/banner
-sed -i 's/%D %V %C/%D %C/' package/base-files/files/etc/openwrt_release
-sed -i -e 's/PRETTY_NAME="%D %V"/PRETTY_NAME="%D %C"/' \
-       -e 's/OPENWRT_RELEASE="%D %V %C"/OPENWRT_RELEASE="%D %C"/' \
-       package/base-files/files/usr/lib/os-release
+# Keep the official ImmortalWrt version templates and machine version fields.
 
 # -------------------------------------------------
 # Keep native reset/upgrade reconnect defaults aligned with 99-w1700k-defaults.

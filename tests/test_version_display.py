@@ -68,6 +68,7 @@ all:
                 subprocess.run(['bash', '-ec', fragment], cwd=root, check=True)
                 self.assertEqual(modified, {name: (base / name).read_bytes() for name in names})
                 after = render()
+                self.assertEqual(after, before)
                 if os.environ.get('VERSION_OUTPUT'):
                     output = Path(os.environ['VERSION_OUTPUT']) / revision
                     for stage, files in (('before', before), ('after', after)):
@@ -76,32 +77,10 @@ all:
                             path.parent.mkdir(parents=True, exist_ok=True)
                             path.write_text(text)
                     (output / 'metadata').write_bytes(metadata)
-                self.assertEqual((root / 'include/version.mk').read_bytes(), version_mk)
-                self.assertEqual((root / 'metadata').read_bytes(), metadata)
+                self.assertEqual((root / "include/version.mk").read_bytes(), version_mk)
+                self.assertEqual((root / "metadata").read_bytes(), metadata)
                 self.assertIn(b'SNAPSHOT\n', metadata)
                 self.assertIn(b'/snapshots\n', metadata)
-                expected = dict(before)
-                expected['etc/banner'] = before['etc/banner'].replace(' SNAPSHOT, ', ' ')
-                expected['etc/openwrt_release'] = before['etc/openwrt_release'].replace(
-                    ' SNAPSHOT ' + revision, ' ' + revision)
-                expected['usr/lib/os-release'] = before['usr/lib/os-release'].replace(
-                    ' SNAPSHOT"', ' ' + revision + '"').replace(' SNAPSHOT ' + revision, ' ' + revision)
-                self.assertEqual(after, expected)
-                def fields(name):
-                    return dict(line.split('=', 1) for line in after[name].splitlines() if '=' in line)
-                release, os_release = fields('etc/openwrt_release'), fields('usr/lib/os-release')
-                display = release['DISTRIB_DESCRIPTION'].strip("'")
-                self.assertNotIn('SNAPSHOT', display)
-                self.assertTrue(display.endswith(' ' + revision))
-                self.assertIn(' ' + display + '\n', after['etc/banner'])
-                self.assertEqual(os_release['PRETTY_NAME'], '"' + display + '"')
-                self.assertEqual(os_release['OPENWRT_RELEASE'], '"' + display + '"')
-                self.assertEqual(release['DISTRIB_RELEASE'], "'SNAPSHOT'")
-                self.assertEqual(os_release['VERSION'], '"SNAPSHOT"')
-                self.assertEqual(os_release['VERSION_ID'], '"snapshot"')
-                self.assertEqual(os_release['BUILD_ID'], '"' + revision + '"')
-                self.assertEqual(after['etc/device_info'], before['etc/device_info'])
-                self.assertEqual(after['etc/openwrt_version'], revision + '\n')
 
 
 if __name__ == '__main__':

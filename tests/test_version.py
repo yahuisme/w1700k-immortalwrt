@@ -43,9 +43,9 @@ class VersionTest(unittest.TestCase):
         workflow = (REPO / ".github/workflows/W1700K.yaml").read_text()
         cls.fragment = textwrap.dedent(workflow.split("          make defconfig\n", 1)[1]
                                       .split("        '", 1)[0])
-        cls.tag = textwrap.dedent(workflow.split('        PREFIX="W1700K-ImmortalWrt_"', 1)[1]
+        cls.tag = textwrap.dedent(workflow.split('        VERSION="W1700K-ImmortalWrt-r', 1)[1]
                                  .split('        RELEASE_NOTES=', 1)[0])
-        cls.tag = 'PREFIX="W1700K-ImmortalWrt_"\n' + cls.tag
+        cls.tag = 'VERSION="W1700K-ImmortalWrt-r' + cls.tag
 
     def prepare(self, root):
         for name, content in self.files.items():

@@ -15,7 +15,7 @@ BLOCK = step('Publish firmware and prune releases')['run']
 PREFIX_MATCH = re.search(r'PREFIX="([^"]+)"', BLOCK)
 assert PREFIX_MATCH is not None
 PREFIX = PREFIX_MATCH[1]
-CURRENT = PREFIX[:-1] + '-r1-current'
+CURRENT = PREFIX + 'r1-current'
 API = ['api', '--paginate', '--slurp', 'repos/fixture/repo/releases?per_page=100']
 GH = '''#!/usr/bin/env python3
 import json, os, sys
@@ -68,7 +68,7 @@ class RetentionTests(unittest.TestCase):
             create = next(c for c in calls if c[:2] == ['release', 'create'])
             self.assertEqual(create[2], CURRENT)
             self.assertEqual(create[create.index('--target') + 1], 'a' * 40)
-            self.assertEqual(create[create.index('--title') + 1], CURRENT.rsplit('-', 1)[0] + '_current')
+            self.assertEqual(create[create.index('--title') + 1], CURRENT)
             if API in calls:
                 self.assertLess(calls.index(create), calls.index(API))
             return result
@@ -83,13 +83,13 @@ class RetentionTests(unittest.TestCase):
         self.replay([[release(PREFIX + 'old', 1), release(CURRENT, 3)]])
 
     def test_three_releases_sorted_by_publication_not_revision(self):
-        old = PREFIX[:-1] + '-r999999-old'
-        self.replay([[release(old, 1), release(CURRENT, 3), release(PREFIX + 'previous', 2)]], [old])
+        old = PREFIX + 'r999999-old'
+        self.replay([[release(old, 1), release(CURRENT, 3), release(PREFIX + 'r2-previous', 2)]], [old])
 
     def test_multiple_pages_filter_before_global_sort(self):
         others = [release(f'unrelated-{i}', 20) for i in range(100)]
-        old = PREFIX + 'old'
-        previous = PREFIX + 'previous'
+        old = PREFIX + 'r1-old'
+        previous = PREFIX + 'r2-previous'
         self.replay([others, [release(old, 1), release(previous, 2)], [release(CURRENT, 3)]], [old])
 
     def test_other_series_retired_oc_draft_prerelease_protected(self):
@@ -107,9 +107,9 @@ class RetentionTests(unittest.TestCase):
                                  release(PREFIX + 'previous', 2), release(CURRENT, 3)]], [old])
 
     def test_current_outside_newest_two_is_never_deleted(self):
-        self.replay([[release(PREFIX + 'newest', 4), release(PREFIX + 'second', 3),
-                      release(CURRENT, 2), release(PREFIX + 'old', 1)]],
-                    [PREFIX + 'second', PREFIX + 'old'])
+        self.replay([[release(PREFIX + 'r4-newest', 4), release(PREFIX + 'r3-second', 3),
+                      release(CURRENT, 2), release(PREFIX + 'r1-old', 1)]],
+                    [PREFIX + 'r3-second', PREFIX + 'r1-old'])
 
     def test_missing_current_skips_cleanup(self):
         result = self.replay([[release(PREFIX + str(i), i) for i in range(1, 5)]])
@@ -127,12 +127,12 @@ class RetentionTests(unittest.TestCase):
         self.replay('[[{')
 
     def test_equal_publication_uses_id_tiebreak(self):
-        old, previous = release(PREFIX + 'old', 2), release(PREFIX + 'previous', 2)
+        old, previous = release(PREFIX + 'r1-old', 2), release(PREFIX + 'r2-previous', 2)
         old['id'], previous['id'] = 1, 2
         self.replay([[old, release(CURRENT, 3), previous]], [old['tag_name']])
 
     def test_deletion_failure_warns_without_failing_publication(self):
-        result = self.replay([[release(CURRENT, 4), release(PREFIX + 'previous', 3),
-                      release(PREFIX + 'old', 2), release(PREFIX + 'oldest', 1)]],
-                    [PREFIX + 'old', PREFIX + 'oldest'], fault='delete')
+        result = self.replay([[release(CURRENT, 4), release(PREFIX + 'r3-previous', 3),
+                      release(PREFIX + 'r2-old', 2), release(PREFIX + 'r1-oldest', 1)]],
+                    [PREFIX + 'r2-old', PREFIX + 'r1-oldest'], fault='delete')
         self.assertIn('::warning::Failed to delete release', result.stdout)
