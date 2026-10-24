@@ -414,5 +414,18 @@ class BootstrapTests(unittest.TestCase):
         self.assertNotEqual(a.stdout, b.stdout)
 
 
+@unittest.skipUnless(os.environ.get('BOOTSTRAP_SOURCE'), 'requires customized source')
+class PreparedBootstrapTests(unittest.TestCase):
+    def test_current_customized_inventory_supports_independent_reuse(self):
+        spec = importlib.util.spec_from_file_location('prepared_bootstrap', SCRIPT)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        root = Path(os.environ['BOOTSTRAP_SOURCE'])
+        self.assertIn(module.inventory(root), module.REVIEWED)
+        self.assertEqual(module.key(root, 'builder', 'tc-one'),
+                         module.key(root, 'builder', 'tc-two'))
+
+
 if __name__ == '__main__':
     unittest.main()

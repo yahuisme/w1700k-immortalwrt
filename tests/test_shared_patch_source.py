@@ -10,6 +10,9 @@ from test_device_runtime import FLASH_RUN, node
 
 ROOT = Path(__file__).resolve().parents[1]
 APPS = ('luci-app-wifi7', 'luci-app-airoha-npu', 'luci-app-airoha-flowsense', 'luci-app-airoha-fancontrol')
+TEMPLATES = tuple('package/base-files/files/' + name for name in (
+    'etc/banner', 'etc/device_info', 'etc/openwrt_release', 'etc/openwrt_version',
+    'usr/lib/os-release')) + ('include/version.mk',)
 
 
 @unittest.skipUnless(os.environ.get('TXPOWER_SOURCE'), 'set TXPOWER_SOURCE to exact unpatched official source')
@@ -36,9 +39,7 @@ class SharedPatchSource(unittest.TestCase):
                     destination.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copyfile(source / name, destination)
                 for name, text in {
-                    'package/base-files/files/etc/banner': '%D %V, %C\n',
-                    'package/base-files/files/etc/openwrt_release': '%D %V %C\n',
-                    'package/base-files/files/usr/lib/os-release': 'PRETTY_NAME="%D %V"\nOPENWRT_RELEASE="%D %V %C"\n',
+                    **{name: (source / name).read_text() for name in TEMPLATES},
                     'feeds/luci/modules/luci-base/po/zh_Hans/base.po': '',
                 }.items():
                     destination = work / name
@@ -48,6 +49,7 @@ class SharedPatchSource(unittest.TestCase):
                 regdb.mkdir(parents=True)
                 for name in ('500-world.patch', '600-custom-change-txpower-and-dfs.patch', '700-keep.patch'):
                     (regdb / name).write_text(name)
+                official_templates = {p: (work / p).read_bytes() for p in TEMPLATES}
                 # Real native view is a required customization input, not an
                 # isolated stub that could let the complete script fail early.
                 flash = Path(os.environ.get('DEVICE_FLASH_JS', source /
@@ -80,6 +82,8 @@ export -f git
                 self.assertEqual(result.returncode == 0, missing is None, result.stdout + result.stderr)
                 self.assertEqual((base / 'calls').read_text(), 'packages\n')
                 if missing is None:
+                    self.assertEqual(official_templates, {p: (work / p).read_bytes()
+                                                        for p in official_templates})
                     node(FLASH_RUN, destination, '192.168.8.1')
                     self.assertFalse((regdb / '600-custom-change-txpower-and-dfs.patch').exists())
                     for name in ('500-world.patch', '700-keep.patch'):

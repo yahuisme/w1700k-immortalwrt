@@ -129,7 +129,7 @@ class CacheDiagnosticsTests(unittest.TestCase):
         self.assertNotIn('ignored stdin secret', result.stderr)
 
     def test_current_policy_without_diagnostics_same_source_reads_order_and_mtimes(self):
-        # Intentionally NOT a frozen v8 key comparison: v9 is a cold generation.
+        # Compare current policy without diagnostics, not a retired generation.
         # Strip only marked diagnostic lines from this exact current policy.
         baseline = Path(self.tmp.name) / 'current_policy_no_diagnostics.py'
         baseline.write_text(''.join(line for line in SCRIPT.read_text().splitlines(keepends=True)

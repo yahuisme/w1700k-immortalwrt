@@ -174,7 +174,7 @@ elif args[0] == 'api' and '/releases/tags/'""")
                 (base / 'gh').write_text(stub)
                 (base / 'gh').chmod(0o755)
                 (base / 'pages.json').write_text(json.dumps([[release(CURRENT, 3),
-                    release(PREFIX+'previous', 2), release(PREFIX+'old', 1)]]))
+                    release(PREFIX+'r2-previous', 2), release(PREFIX+'r1-old', 1)]]))
                 env = dict(os.environ, PATH=tmp+':'+os.environ['PATH'], GITHUB_SHA='a'*40,
                            GITHUB_REPOSITORY='fixture/repo', FAULT='', MODE=mode, IMAGE=IMAGE)
                 result = subprocess.run(['bash', '-eo', 'pipefail', '-c',
@@ -183,5 +183,5 @@ elif args[0] == 'api' and '/releases/tags/'""")
                 good = mode in ('ok', 'download')
                 self.assertEqual(result.returncode == 0, good, result.stderr)
                 calls = [json.loads(line) for line in (base / 'calls').read_text().splitlines()]
-                self.assertEqual([c[2] for c in calls if c[:2] == ['release', 'delete']],
-                                 [PREFIX+'old'] if good else [])
+                self.assertCountEqual([c[2] for c in calls if c[:2] == ['release', 'delete']],
+                                      [PREFIX+'r2-previous', PREFIX+'r1-old'] if good else [])

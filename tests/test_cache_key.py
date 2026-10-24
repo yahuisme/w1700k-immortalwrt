@@ -188,7 +188,7 @@ class KeyTests(unittest.TestCase):
         alternate.write_text(SCRIPT.read_text().replace('def pack(root, cache, kind, expected):',
                             'def pack(root, cache, kind, expected):\n    # unrelated upload edit'))
         self.assertEqual(before, load(alternate).key(self.root, 'image-sha'))
-        alternate.write_text(SCRIPT.read_text().replace('tc-inputs-v9', 'tc-inputs-test'))
+        alternate.write_text(SCRIPT.read_text().replace('tc-inputs-v10', 'tc-inputs-test'))
         self.assertNotEqual(before, load(alternate).key(self.root, 'image-sha'))
 
     def test_nonnoise_config_values_and_comments_participate(self):

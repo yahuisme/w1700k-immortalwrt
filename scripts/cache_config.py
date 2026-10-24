@@ -19,6 +19,11 @@ def fingerprint_bytes(raw):
     if any(ord(char) == 127 or ord(char) < 32 and char not in '\n\t' for char in text):
         return raw
     seen, kept = set(), []
+    boost_defined = False
+    # Audited package-only Kconfig selectors, removed by the Boost recipe.
+    # Any explicit Boost package assignment keeps these records in the lock.
+    boost_unset = {f'# CONFIG_boost-{name}-exclude is not set\n'
+                   for name in ('context', 'coroutine', 'fiber')}
     for line in text.splitlines(keepends=True):
         # Avoid make comment continuations and unfamiliar line separators.
         if not line.endswith('\n') or line.endswith('\\\n'):
@@ -35,11 +40,13 @@ def fingerprint_bytes(raw):
             if symbol == 'CONFIG_PACKAGE_' or symbol in seen:
                 return raw
             seen.add(symbol)
+            if assignment and (symbol == 'CONFIG_PACKAGE_boost' or symbol.startswith('CONFIG_PACKAGE_boost-')):
+                boost_defined = True
         elif line != '\n' and (not line.startswith('#') or line[1:].lstrip().startswith('CONFIG_')):
             return raw
         if not unset or not unset[1].startswith('CONFIG_PACKAGE_') or unset[1] == 'CONFIG_PACKAGE_':
             kept.append(line)
-    return ''.join(kept).encode('utf-8')
+    return ''.join(line for line in kept if boost_defined or line not in boost_unset).encode('utf-8')
 
 
 def policy_bytes():

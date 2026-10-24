@@ -1,7 +1,7 @@
-"""Render real upstream templates, without compiling or running defconfig.
+"""Render real official templates; full custom preservation is tested separately.
 
-VERSION_SOURCE=/path/to/downloaded/upstream python3 tests/test_version_display.py
-The source needs include/version.mk, rules.mk and package/base-files/.
+VERSION_SOURCE=/path/to/fixed/upstream python3 tests/test_version_display.py
+No compilation or defconfig; make executes only the upstream version sed recipe.
 """
 import os
 from pathlib import Path
@@ -11,11 +11,9 @@ import subprocess
 import tempfile
 import unittest
 
-ROOT = Path(__file__).resolve().parents[1]
-
 
 class VersionDisplay(unittest.TestCase):
-    def test_display_only(self):
+    def test_official_snapshot_templates_and_machine_metadata(self):
         source = os.environ.get('VERSION_SOURCE')
         if not source:
             self.skipTest('set VERSION_SOURCE to real upstream templates')
@@ -24,19 +22,13 @@ class VersionDisplay(unittest.TestCase):
                             (source / 'package/base-files/Makefile').read_text(), re.S)
         assert install is not None, 'upstream template install list changed'
         names = re.findall(r'\$\(1\)/(\S+)', install[1])
-        script = (ROOT / 'user/default/custom.sh').read_text()
-        fragment = script.split('# Snapshot branding is display-only;', 1)[1].split('\n# ---', 1)[0]
-        fragment = '# Snapshot branding is display-only;' + fragment
         qstrip = next(line for line in (source / 'rules.mk').read_text().splitlines()
                       if line.startswith('qstrip='))
-        # Explicit test inputs, not claimed build results or replacement revision numbers.
         for revision in ('r41341-f44d1535b4', 'r12345-0123456789'):
             with self.subTest(revision=revision), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
                 shutil.copytree(source / 'package/base-files', root / 'package/base-files')
                 shutil.copytree(source / 'include', root / 'include')
-                base = root / 'package/base-files/files'
-                originals = {name: (base / name).read_bytes() for name in names}
                 version_mk = (root / 'include/version.mk').read_bytes()
                 makefile = f'''empty:=
 space:=$(empty) $(empty)
@@ -55,32 +47,17 @@ all:
 \t@printf '%s\\n' '$(VERSION_NUMBER)' '$(VERSION_CODE)' '$(VERSION_REPO)' > metadata
 '''
                 (root / 'Makefile').write_text(makefile)
-                def render():
-                    subprocess.run(['make', '--no-print-directory'], cwd=root, check=True,
-                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    return {name: (base / name).read_text() for name in names}
-                before = render()
-                metadata = (root / 'metadata').read_bytes()
-                for name, data in originals.items():
-                    (base / name).write_bytes(data)
-                subprocess.run(['bash', '-ec', fragment], cwd=root, check=True)
-                modified = {name: (base / name).read_bytes() for name in names}
-                subprocess.run(['bash', '-ec', fragment], cwd=root, check=True)
-                self.assertEqual(modified, {name: (base / name).read_bytes() for name in names})
-                after = render()
-                self.assertEqual(after, before)
-                if os.environ.get('VERSION_OUTPUT'):
-                    output = Path(os.environ['VERSION_OUTPUT']) / revision
-                    for stage, files in (('before', before), ('after', after)):
-                        for name, text in files.items():
-                            path = output / stage / name
-                            path.parent.mkdir(parents=True, exist_ok=True)
-                            path.write_text(text)
-                    (output / 'metadata').write_bytes(metadata)
-                self.assertEqual((root / "include/version.mk").read_bytes(), version_mk)
-                self.assertEqual((root / "metadata").read_bytes(), metadata)
-                self.assertIn(b'SNAPSHOT\n', metadata)
-                self.assertIn(b'/snapshots\n', metadata)
+                subprocess.run(['make', '--no-print-directory'], cwd=root, check=True,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                base = root / 'package/base-files/files'
+                self.assertEqual((root / 'include/version.mk').read_bytes(), version_mk)
+                metadata = (root / 'metadata').read_text().splitlines()
+                self.assertEqual(metadata[:2], ['SNAPSHOT', revision])
+                self.assertTrue(metadata[2].endswith('/snapshots'))
+                self.assertEqual((base / 'etc/openwrt_version').read_text(), revision + '\n')
+                self.assertIn(' SNAPSHOT, ' + revision, (base / 'etc/banner').read_text())
+                self.assertIn("DISTRIB_REVISION='" + revision + "'", (base / 'etc/openwrt_release').read_text())
+                self.assertIn('BUILD_ID="' + revision + '"', (base / 'usr/lib/os-release').read_text())
 
 
 if __name__ == '__main__':

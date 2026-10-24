@@ -20,11 +20,11 @@ except ImportError:
         import cache_config
 
 EPOCH = 946684800
-# Production post-customization source locks (OpenWrt 906c981d2c3b and
+# Production post-customization source locks (OpenWrt 6db25ee835eb and
 # ImmortalWrt 2f97ee0c9fad): canonical JSON path/permission/content records.
 # Unknown inventory uses TC_KEY, never a guessed config projection.
 REVIEWED = {
-    '641f34557604c0b4f8a3637af610b541985155915ab938ac64cbe8dca36c3fa6',
+    'b3f6c374eef006bf64bce517c965fc25c41ad9bbe88ea9fc418f9580d922f93e',
     '1833836d0460ca850a3bd03429a430ead837513e4899eb20725e1f6dbf6c2da6',
 }
 FIXED_INPUTS = ('Makefile', 'rules.mk', 'package/Makefile', 'target/Makefile',
@@ -123,7 +123,7 @@ def key(root, builder, tc_key):
     independent = source in REVIEWED and values.get('CONFIG_BUILD_ALL_HOST_TOOLS') != 'y'
     environment = {name: os.environ.get(name) for name in ENVIRONMENT}
     host = os.uname()
-    data = ['bootstrap-v2', builder, [host.sysname, host.release, host.version, host.machine], str(root), EPOCH,
+    data = ['bootstrap-v3', builder, [host.sysname, host.release, host.version, host.machine], str(root), EPOCH,
             hashlib.sha256(Path(__file__).read_bytes()).hexdigest(), environment,
             hashlib.sha256(cache_config.policy_bytes()).hexdigest(),
             hashlib.sha256(cache_config.fingerprint_bytes(raw)).hexdigest(), stat.S_IMODE((root / '.config').stat().st_mode),

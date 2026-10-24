@@ -53,6 +53,32 @@ class FinalConfigTests(unittest.TestCase):
         self.assertEqual(path.read_bytes(), raw)
         self.assertEqual(path.stat().st_mtime_ns, self.tc.EPOCH * 1_000_000_000)
         self.assertEqual(self.tb.configuration(self.root)[0], raw)
+    def test_inactive_boost_selectors_do_not_invalidate_either_cache(self):
+        before = self.keys()
+        selectors = ('context', 'coroutine', 'fiber')
+        raw = self.raw + ''.join(
+            f'# CONFIG_boost-{name}-exclude is not set\n' for name in selectors).encode()
+        path = self.put('.config', raw)
+        self.assertEqual(before, self.keys())
+        self.assertEqual(path.read_bytes(), raw)
+
+    def test_boost_assignments_and_active_packages_keep_selectors_locked(self):
+        helper = self.tc.cache_config
+        selector = b'# CONFIG_boost-context-exclude is not set\n'
+        for package in ('boost', 'boost-context', 'boost-fiber', 'boost-headers'):
+            for state in ('y', 'm', 'n'):
+                raw = self.raw + f'CONFIG_PACKAGE_{package}={state}\n'.encode() + selector
+                with self.subTest(package=package, state=state):
+                    self.assertEqual(helper.fingerprint_bytes(raw), raw)
+        for state in ('y', 'm', 'n'):
+            raw = self.raw + f'CONFIG_boost-context-exclude={state}\n'.encode()
+            self.assertEqual(helper.fingerprint_bytes(raw), raw)
+        for extra in (selector, b'CONFIG_boost-context-exclude=y\n'):
+            raw = self.raw + selector + extra
+            self.assertEqual(helper.fingerprint_bytes(raw), raw)
+        raw = self.raw + b'# CONFIG_boost-future-exclude is not set\n'
+        self.assertEqual(helper.fingerprint_bytes(raw), raw)
+
     def test_ambiguous_or_unknown_format_keeps_entire_raw_bytes(self):
         helper = self.tc.cache_config
         noise = b'# CONFIG_PACKAGE_noise is not set\n'

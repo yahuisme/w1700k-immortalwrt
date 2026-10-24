@@ -55,7 +55,7 @@ def record_input_group(groups, name, record):
 def key(root, builder):
     # Final defconfig; ignore only hash-only canonical unselected-package noise.
     # Archive/upload edits do not participate in the compatibility policy.
-    digest = hashlib.sha256(json.dumps(['tc-inputs-v9', builder, os.uname().machine,
+    digest = hashlib.sha256(json.dumps(['tc-inputs-v10', builder, os.uname().machine,
                                       str(root), EPOCH, INPUTS,
                                       key_policy_source(),
                                       hashlib.sha256(cache_config.policy_bytes()).hexdigest()]).encode())

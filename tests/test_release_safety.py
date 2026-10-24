@@ -178,7 +178,7 @@ elif args[:2]!=['release','delete']: sys.exit(99)
                 self.assertEqual(result.returncode == 0, case in ('fresh', 'stale', 'advance'), result.stderr)
                 self.assertEqual(bool(creates), case in ('fresh', 'advance', 'recheck-error', 'create-error'))
                 if creates: self.assertEqual(creates[0][creates[0].index('--target') + 1], 'a'*40)
-                self.assertEqual(set(deletes), set(standard[:2]) if case == 'fresh' else set())
+                self.assertEqual(set(deletes), set(standard) if case == 'fresh' else set())
                 self.assertEqual(calls[0], ['api', 'repos/fixture/repo/git/ref/heads/main', '--jq', '.object.sha'])
                 if case == 'stale':
                     # A successful skipped publication leaves ordinary cache steps runnable.

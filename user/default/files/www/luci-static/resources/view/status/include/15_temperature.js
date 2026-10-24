@@ -29,15 +29,14 @@ return baseclass.extend({
 		];
 
 		function temp(value) {
-			value = Number(value);
-			return isFinite(value) && value > 0 ? value + ' °C' : '--';
+			return value != null && isFinite(Number(value)) ? Number(value) + ' °C' : '--';
 		}
 
 		function color(value) {
-			value = Number(value);
-
-			if (!isFinite(value) || value <= 0)
+			if (value == null || !isFinite(Number(value)))
 				return '';
+
+			value = Number(value);
 
 			if (value < 50)
 				return 'var(--success,var(--success-color-high,#15803d))';

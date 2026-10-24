@@ -104,7 +104,7 @@ const assert = require('node:assert/strict');
 // Trusted local view bytes only; fs/RPC/DOM are inert and never execute commands.
 const source = require('node:fs').readFileSync(process.argv[1], 'utf8');
 function E(tag, attrs, children) {
- const n = {children: [], appendChild(x) { this.children.push(x); }};
+ const n = {attrs, children: [], appendChild(x) { this.children.push(x); }};
  if (children != null) n.children = Array.isArray(children) ? children : [children];
  return n;
 }
@@ -118,6 +118,12 @@ for (const [rpm, pct, expected] of [
  const tree = widget.render({temp_cpu:42, fan_rpm:rpm, fan_percentage:pct});
  assert.equal(text(tree.children.at(-1)), 'Fan|' + expected, String(rpm));
  assert.equal(text(tree.children[0]), 'CPU|42 °C');
+}
+for (const [value, expected] of [[0,'0 °C'],[-12,'-12 °C'],[42,'42 °C'],[null,'--'],[undefined,'--'],[NaN,'--'],[Infinity,'--']]) {
+ const tree = widget.render({temp_board:value});
+ assert.equal(text(tree.children[1]), 'Motherboard|' + expected, String(value));
+ const style = tree.children[1].children[1].attrs.style;
+ assert.equal(style.includes('color:'), expected !== '--', String(value));
 }
 assert.equal(text(widget.render(null).children.at(-1)), 'Fan|--');
 """, widget)

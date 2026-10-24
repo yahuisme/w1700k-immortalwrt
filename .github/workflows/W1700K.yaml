@@ -323,8 +323,8 @@ jobs:
         if releases=$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100") &&
           old_tags=$(jq -er --arg current "$VERSION" --arg pattern "^(${PREFIX}r[0-9]+-|W1700K-ImmortalWrt_|W1700K-ubi2[-_])" '
             flatten | map(select(.draft == false and .prerelease == false and
-              (.tag_name | test($pattern)))) |
-            sort_by(.published_at, .id) | reverse |
+              (.tag_name | test($pattern)) and
+              (.tag_name | test("^W1700K-ubi2[-_]oc([-_]|$)"; "i") | not))) |
             if any(.tag_name == $current) then
               [.[] | select(.tag_name != $current)] | map(.tag_name) | join("\n")
             else error("Published release missing from inventory") end

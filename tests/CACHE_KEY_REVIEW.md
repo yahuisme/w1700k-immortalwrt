@@ -4,11 +4,13 @@
 
 The key hashes the final `.config` fingerprint bytes, source contents and modes
 under `INPUTS`, builder identity, host architecture, build path and fingerprint
-policy. Only strict canonical LF-terminated unset-package records may be omitted
+policy. Strict canonical LF-terminated unset-package records may be omitted
 from the final-config hash; the generated on-disk configuration is never edited.
 Selected package assignments, explicit `=n`, non-package options and other bytes
-remain inputs. Ambiguous, duplicate/conflicting or malformed syntax keeps the raw
-input. The workflow still runs the exact local `IMAGE_ID`, but does not use OCI
+remain inputs, except the three audited unset `boost-{context,coroutine,fiber}-exclude`
+selectors when no Boost package has any explicit assignment. Unknown selectors,
+selected Boost packages retain their original lock. Duplicate/conflicting or
+malformed syntax keeps the complete raw input. The workflow still runs the exact local `IMAGE_ID`, but does not use OCI
 creation timestamps as compatibility identity.
 
 `scripts/builder_fingerprint.py` runs inside that container before source prep.
@@ -29,8 +31,9 @@ non-dpkg downloads, build-arg overrides or ad-hoc container mutations without
 verified identities in this contract. Implementation changes invalidate identity.
 
 Toolchain restore remains exact (no prefix fallback). The new config-fingerprint
-policy deliberately starts a new toolchain/bootstrap generation; old exact keys
-are not reused. Rolling compiler/download namespaces, archive formats and
+policy (`tc-inputs-v10` / `bootstrap-v3`) deliberately starts a new exact
+generation; old exact keys are not reused. The first run repopulates these two
+tiers, while rolling compiler/download caches remain reusable. Rolling compiler/download namespaces, archive formats and
 scheduling are retained. This is not an all-package CONFIG projection or a
 toolchain audited-source lock. Selected package/version settings and
 literal DEFAULT_PACKAGES changes remain invalidators. External mutable compiler,

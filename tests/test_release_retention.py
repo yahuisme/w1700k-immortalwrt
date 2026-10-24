@@ -63,7 +63,7 @@ class RetentionTests(unittest.TestCase):
                                     cwd=base, env=env, capture_output=True, text=True)
             calls = [json.loads(line) for line in (base / 'calls').read_text().splitlines()]
             self.assertEqual(result.returncode == 0, success, result.stdout + result.stderr)
-            self.assertEqual([c[2] for c in calls if c[:2] == ['release', 'delete']], list(expected))
+            self.assertCountEqual([c[2] for c in calls if c[:2] == ['release', 'delete']], expected)
             self.assertEqual(API in calls, fault != 'create')
             create = next(c for c in calls if c[:2] == ['release', 'create'])
             self.assertEqual(create[2], CURRENT)
@@ -79,60 +79,65 @@ class RetentionTests(unittest.TestCase):
     def test_one_release(self):
         self.replay([[release(CURRENT, 3)]])
 
-    def test_two_releases(self):
-        self.replay([[release(PREFIX + 'old', 1), release(CURRENT, 3)]])
+    def test_current_plus_one_old_keeps_only_current(self):
+        self.replay([[release(PREFIX + 'r1-old', 1), release(CURRENT, 3)]], [PREFIX + 'r1-old'])
 
-    def test_three_releases_sorted_by_publication_not_revision(self):
+    def test_all_noncurrent_releases_deleted_regardless_of_revision(self):
         old = PREFIX + 'r999999-old'
-        self.replay([[release(old, 1), release(CURRENT, 3), release(PREFIX + 'r2-previous', 2)]], [old])
+        self.replay([[release(old, 1), release(CURRENT, 3), release(PREFIX + 'r2-previous', 2)]], [old, PREFIX + 'r2-previous'])
 
-    def test_multiple_pages_filter_before_global_sort(self):
+    def test_multiple_pages_keep_protected_series(self):
         others = [release(f'unrelated-{i}', 20) for i in range(100)]
         old = PREFIX + 'r1-old'
         previous = PREFIX + 'r2-previous'
-        self.replay([others, [release(old, 1), release(previous, 2)], [release(CURRENT, 3)]], [old])
+        self.replay([others, [release(old, 1), release(previous, 2)], [release(CURRENT, 3)]], [old, previous])
 
     def test_other_series_retired_oc_draft_prerelease_protected(self):
         protected = [release(t, 20) for t in (
             'unrelated', 'MX4200-ImmortalWrt-r9-old', 'W1700K-ubi2-oc_old',
+            'W1700K-ubi2_oc-r9-old', 'W1700K-ubi2-OC_old', 'W1700K-ubi2_OC-r9-old',
             PREFIX[:-1] + '-OC_old', PREFIX[:-1] + '-OC-r9-old',
             'W1700K-OC-Immortalwrt_old',
             'W1700K-ImmortalWrt_old' if 'OpenWrt' in PREFIX else 'W1700K-OpenWrt_old')]
-        draft = release(PREFIX + 'draft', 21)
+        draft = release(PREFIX + 'r8-draft', 21)
         draft['draft'] = True
-        pre = release(PREFIX + 'pre', 22)
+        pre = release(PREFIX + 'r9-pre', 22)
         pre['prerelease'] = True
         old = 'W1700K-ubi2_old'
         self.replay([protected + [draft, pre, release(old, 1),
-                                 release(PREFIX + 'previous', 2), release(CURRENT, 3)]], [old])
+                                 release(PREFIX + 'r2-previous', 2), release(CURRENT, 3)]], [PREFIX + 'r2-previous', old])
 
-    def test_current_outside_newest_two_is_never_deleted(self):
+    def test_legacy_standard_forms_still_pruned(self):
+        tags = [PREFIX[:-1] + '_legacy', 'W1700K-ubi2_old', 'W1700K-ubi2-r1-old']
+        self.replay([[release(CURRENT, 3)] + [release(tag, 1) for tag in tags]], tags)
+
+    def test_current_outside_newest_two_is_only_survivor(self):
         self.replay([[release(PREFIX + 'r4-newest', 4), release(PREFIX + 'r3-second', 3),
                       release(CURRENT, 2), release(PREFIX + 'r1-old', 1)]],
-                    [PREFIX + 'r3-second', PREFIX + 'r1-old'])
+                    [PREFIX + 'r4-newest', PREFIX + 'r3-second', PREFIX + 'r1-old'])
 
     def test_missing_current_skips_cleanup(self):
-        result = self.replay([[release(PREFIX + str(i), i) for i in range(1, 5)]])
+        result = self.replay([[release(PREFIX + f'r{i}-old', i) for i in range(1, 5)]])
         self.assertIn('retaining all releases', result.stdout)
 
     def test_create_failure_prevents_listing_and_deletion(self):
-        self.replay([[release(CURRENT, 3), release(PREFIX + 'previous', 2),
-                      release(PREFIX + 'old', 1)]], fault='create', success=False)
+        self.replay([[release(CURRENT, 3), release(PREFIX + 'r2-previous', 2),
+                      release(PREFIX + 'r1-old', 1)]], fault='create', success=False)
 
     def test_partial_listing_failure_cannot_delete(self):
-        self.replay([[release(CURRENT, 3), release(PREFIX + 'previous', 2),
-                      release(PREFIX + 'old', 1)]], fault='list')
+        self.replay([[release(CURRENT, 3), release(PREFIX + 'r2-previous', 2),
+                      release(PREFIX + 'r1-old', 1)]], fault='list')
 
     def test_malformed_listing_cannot_delete(self):
         self.replay('[[{')
 
-    def test_equal_publication_uses_id_tiebreak(self):
+    def test_equal_publication_deletes_all_noncurrent_regardless_of_id(self):
         old, previous = release(PREFIX + 'r1-old', 2), release(PREFIX + 'r2-previous', 2)
         old['id'], previous['id'] = 1, 2
-        self.replay([[old, release(CURRENT, 3), previous]], [old['tag_name']])
+        self.replay([[old, release(CURRENT, 3), previous]], [old['tag_name'], previous['tag_name']])
 
     def test_deletion_failure_warns_without_failing_publication(self):
         result = self.replay([[release(CURRENT, 4), release(PREFIX + 'r3-previous', 3),
                       release(PREFIX + 'r2-old', 2), release(PREFIX + 'r1-oldest', 1)]],
-                    [PREFIX + 'r2-old', PREFIX + 'r1-oldest'], fault='delete')
+                    [PREFIX + 'r3-previous', PREFIX + 'r2-old', PREFIX + 'r1-oldest'], fault='delete')
         self.assertIn('::warning::Failed to delete release', result.stdout)
