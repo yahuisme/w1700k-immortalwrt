@@ -34,9 +34,18 @@ def inv():
     raw = subprocess.check_output(['gh', 'api', '--paginate', '--slurp',
                                   'repos/{owner}/{repo}/actions/caches?per_page=100'], text=True)
     pages = json.loads(raw)
+    if not isinstance(pages, list) or not pages:
+        raise ValueError('missing cache inventory pages')
     entries = []
     seen = set()
+    total = None
     for page in pages:
+        if (not isinstance(page, dict) or type(page.get('total_count')) is not int
+                or page['total_count'] < 0 or not isinstance(page.get('actions_caches'), list)):
+            raise ValueError('invalid cache inventory page')
+        if total is not None and page['total_count'] != total:
+            raise ValueError('cache inventory changed during pagination')
+        total = page['total_count']
         for e in page['actions_caches']:
             if (type(e['id']) is not int or type(e['size_in_bytes']) is not int
                     or e['size_in_bytes'] < 0 or not isinstance(e['key'], str)
@@ -44,6 +53,8 @@ def inv():
                 raise ValueError('invalid or duplicate cache inventory entry')
             seen.add(e['id'])
             entries.append(e)
+    if len(entries) != total:
+        raise ValueError('incomplete cache inventory')
     return entries
 
 

@@ -44,7 +44,8 @@ if a == ['api', '--paginate', '--slurp', 'repos/{owner}/{repo}/actions/caches?pe
         entries = [e for e in entries if e['id'] != s['lose_id']]
         s['entries'] = entries
         p.write_text(json.dumps(s))
-    print(json.dumps([{'actions_caches': entries[n:n+2]} for n in range(0, len(entries), 2)] or [{'actions_caches': []}]))
+    pages = [{'total_count': len(entries), 'actions_caches': entries[n:n+2]} for n in range(0, len(entries), 2)]
+    print(json.dumps(s.get('raw_pages', pages or [{'total_count': 0, 'actions_caches': []}])))
 elif len(a) == 3 and a[:2] == ['cache', 'delete'] and a[2].isdigit():
     if int(a[2]) == s.get('fail_delete'):
         p.write_text(json.dumps(s)); sys.exit(19)
@@ -387,6 +388,26 @@ class HelperTests(unittest.TestCase):
                 self.assertIn('already deleted IDs=[2, 5]', log)
             if fault == {'fail_delete': 2}:
                 self.assertEqual(self.snapshot()['entries'], self.caches())
+
+    def test_incomplete_inventory_never_admits_or_deletes(self):
+        caches = [entry(1, CC + 'new'), entry(2, CC + 'old')]
+        invalid = [[], {}, [{'actions_caches': caches}],
+                   [{'total_count': 3, 'actions_caches': caches}],
+                   [{'total_count': 0, 'actions_caches': caches}],
+                   [{'total_count': True, 'actions_caches': []}],
+                   [{'total_count': '2', 'actions_caches': caches}],
+                   [{'total_count': -1, 'actions_caches': []}],
+                   [{'total_count': 2, 'actions_caches': caches[:1]},
+                    {'total_count': 3, 'actions_caches': caches[1:]}],
+                   [{'total_count': 0, 'actions_caches': {}}],
+                   [None]]
+        for pages in invalid:
+            with self.subTest(pages=pages):
+                self.reset(caches, raw_pages=pages)
+                self.assertFalse(self.admit(1))
+                self.assertIn('cleanup unverified', self.cleanup(CC + 'new', CC))
+                self.assertFalse(self.deletes())
+                self.assertEqual(self.snapshot()['entries'], caches)
 
     def test_invalid_inventory_fails_closed(self):
         for entries in ([entry(1, 'legacy', -1)], [entry(1, 'legacy', '100')],

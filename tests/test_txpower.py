@@ -279,7 +279,8 @@ exit(selected);
 
     def test_config_power_change_bypasses_csa_and_early_reload(self):
         code = '''let restarted=0;let csa=0;let removed=0;
-let hostapd={data:{config:{},pending_config:{}},interfaces:{'phy0.0':{}},printf:()=>{}};
+let hostapd={data:{config:{},pending_config:{}},interfaces:{'phy0.0':{}},
+ printf:(message)=>{if(index(message,'Error reloading config:')==0) die(message);}};
 function phy_open(p,r){return {name:'phy0.0'};}
 function iface_check_mld(){} function iface_update_supplicant_macaddr(){}
 function iface_restart(){restarted++;return 0;}
@@ -288,6 +289,10 @@ function is_equal(a,b){return sprintf('%J',a)==sprintf('%J',b);}
 function bss_list_prev_macaddr(current,previous){return current;}
 function radio_reload_class(){return 'channel';}
 function iface_channel_switch(){csa++;return true;}
+// Driver channel/start predicates are inert boundaries: this fixture requests
+// CSA on an already running interface, independently of hardware state.
+function iface_runs_channel(){return false;}
+function iface_start_failed(){return false;}
 ''' + function(self.host, 'iface_reload_config') + function(self.host, 'iface_set_config') + '''
 let old={phy:'phy0',radio_idx:0,txpower:'fixed 2300',bss:[{ifname:'ap0'}]};
 hostapd.data.config['phy0.0']=old;
@@ -303,12 +308,14 @@ printf('%J',{power_change,restarted,csa});
 
     def test_teardown_cancels_pending_setup(self):
         result = self.run_ucode('''let aborted=false;
-let hostapd={data:{apsta_freq:{},pending_config:{'phy0.0':{abort:()=>{aborted=true;}}}},remove_iface:()=>{}};
+let hostapd={data:{apsta_freq:{},apsta_stopped:{'phy0.0':true},
+ pending_config:{'phy0.0':{abort:()=>{aborted=true;}}}},remove_iface:()=>{}};
 function iface_remove(c){}
 ''' + function(self.host, 'iface_config_remove') + '''
-iface_config_remove('phy0.0',{}); printf('%J',aborted);
+iface_config_remove('phy0.0',{});
+printf('%J',{aborted,stopped:hostapd.data.apsta_stopped['phy0.0']!=null});
 ''')
-        self.assertTrue(result)
+        self.assertEqual(result, {'aborted': True, 'stopped': False})
 
     def test_power_change_forces_existing_restart_path(self):
         result = self.run_ucode('''let hostapd={data:{pending_config:{}}};
