@@ -6,7 +6,52 @@ import tempfile
 import unittest
 from test_cache_workflow import render, step
 
+ROOT = Path(__file__).resolve().parents[1]
+
 class RevisionLogTests(unittest.TestCase):
+    def test_custom_donor_checkout_preserves_only_packages_git_provenance(self):
+        script = (ROOT / 'user/default/custom.sh').read_text()
+        block = ('PKG_REPO=$(mktemp -d)\ntrap \'rm -rf "$PKG_REPO"\' EXIT\n'
+                 + script[script.index('if ! git clone --depth=1 https://github.com/yahuisme/packages.git'):
+                          script.index('# Required patches')])
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            donor = base / 'donor'
+            donor.mkdir()
+            def git(*args):
+                return subprocess.check_output(['git', '-C', str(donor), *args], text=True,
+                                               stderr=subprocess.DEVNULL).strip()
+            git('init')
+            for name in ('luci-app-wifi7', 'luci-app-airoha-npu', 'luci-app-airoha-flowsense', 'luci-app-airoha-fancontrol'):
+                (donor / name).mkdir()
+                (donor / name / 'Makefile').write_text('# fixture\n')
+            git('add', '.')
+            git('-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'fixture')
+            sha = git('rev-parse', 'HEAD')
+            for failure in ('', 'clone', 'revision'):
+                with self.subTest(failure=failure), tempfile.TemporaryDirectory(dir=base) as work:
+                    work = Path(work)
+                    (work / 'package').mkdir()
+                    stub = '''git() {
+                      if [ "$1" = clone ]; then
+                        [ "$FAIL" != clone ] || return 19
+                        command git clone --quiet "$DONOR" "${@: -1}"
+                      else
+                        [ "$FAIL" != revision ] || return 19
+                        command git "$@"
+                      fi
+                    }
+                    '''
+                    result = subprocess.run(['bash', '-e', '-c', stub + block], cwd=work,
+                                            env=dict(os.environ, DONOR=str(donor), FAIL=failure),
+                                            text=True, capture_output=True)
+                    self.assertEqual(result.returncode == 0, not failure, result.stderr)
+                    if not failure:
+                        self.assertEqual(result.stdout.count(sha), 1, result.stdout)
+                        self.assertIn('yahuisme/packages: ' + sha, result.stdout)
+                        rows = [line.split('\t') for line in (work / '.custom-revisions.tsv').read_text().splitlines()]
+                        self.assertEqual(rows, [['yahuisme/packages', str(donor), sha]])
+
     def test_nested_prepare_logs_and_failures(self):
         block = render(step('inputs')['run'], {})
         for phase in ('', 'fetch', 'git-access', 'feed-revision', 'update', 'install', 'custom'):
