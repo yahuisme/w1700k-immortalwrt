@@ -54,6 +54,9 @@ are never touched. PAX archives preserve nanoseconds and restore matching
 
 ## Independent compiler bootstrap
 
+Current immutable source locks, producer review and no-compilation acceptance:
+[BOOTSTRAP_SOURCE_REVIEW.md](BOOTSTRAP_SOURCE_REVIEW.md).
+
 `tb-v1-ubi2-` is an exact, optional companion to the existing toolchain cache.
 It is queried only after an exact toolchain miss. A hit restores the paired
 host build/staging snapshot and still runs `make tools/ccache/compile`; GNU make,
@@ -107,17 +110,31 @@ restore; a source-content mutation must miss and compile on the cold path.
 It modifies the supplied disposable tree. Empty toolchain layout fixtures are
 **not GCC validation**. These checks do not establish full firmware build speed.
 
-## Download capacity regression
+## Download capacity and replacement
 
-Download packing and admission both allow exactly **3,200,000,000 bytes**.
-The 10,000,000,000-byte repository budget, 64 MiB minimum wrapper margin,
-keys and save → confirmation → old-generation pruning remain unchanged.
-`test_cache_helper.py` replays the saved paginated inventories in
-`fixtures/download-cache-inventory.json`, measured 2.403/2.356 GB outputs,
-sparse cap/cap+1 and old/new coexistence with the measured other tiers.
-Every replacement is rejected when all tiers already occupy their maxima;
-The per-download cap does not guarantee unlimited rollover headroom.
-Compression alone is stubbed for size tests; these are not speed benchmarks.
+Download packing and admission allow **4,000,000,000 bytes**, covering the
+current measured 3.749/3.739 GB archives. The total repository budget remains
+10,000,000,000 bytes, including every namespace/ref and wrapper margin.
+
+The download admission step alone opts into `--replace-download`. When old/new
+seeds cannot coexist, it first validates the complete inventory and local
+nonempty regular archive, then proves that removing this branch's old owned
+download keys can make room. It deletes only the minimum required IDs and
+verifies their absence, all protected IDs and the actual remaining budget
+before allowing upload. Other refs, legacy entries, compiler, bootstrap and
+toolchain caches cannot be pre-deleted. A fitting replacement deletes nothing.
+
+This explicitly authorized policy can leave no download seed if the subsequent
+upload fails; future builds can download sources again. Upload confirmation
+and normal post-save cleanup remain required. Other tiers retain the original
+save → confirmation → old-generation pruning policy. Keys and compatibility
+fingerprints do not change for this capacity adjustment.
+
+`test_download_replacement.py` and `test_cache_order.py` exercise actual helper
+and YAML boundaries using sparse candidates and private GitHub stubs: measured
+first/steady replacement, cap/cap+1, minimum deletion, protected peers, malformed
+inventory, insufficient space, delete/readback and upload failures. These are
+control-flow/capacity checks, not compression or CI speed benchmarks.
 
 ## Compression choice
 
