@@ -1,9 +1,0 @@
-# This file is auto-generated and build-specific, any changes will be intentionally lost in sysupgrade.
-# Add your custom feeds to /etc/apk/repositories.d/customfeeds.list
-https://downloads.immortalwrt.org/snapshots/targets/airoha/an7581/packages/packages.adb
-https://downloads.immortalwrt.org/snapshots/packages/aarch64_cortex-a53/base/packages.adb
-https://downloads.immortalwrt.org/snapshots/packages/aarch64_cortex-a53/luci/packages.adb
-https://downloads.immortalwrt.org/snapshots/packages/aarch64_cortex-a53/packages/packages.adb
-https://downloads.immortalwrt.org/snapshots/packages/aarch64_cortex-a53/routing/packages.adb
-https://downloads.immortalwrt.org/snapshots/packages/aarch64_cortex-a53/telephony/packages.adb
-# 不配置官方 kmods 源：自建补丁与配置改变内核 ABI，禁止混装官方内核模块。
