@@ -16,7 +16,7 @@ class OfficialBaselineTests(unittest.TestCase):
         self.assertNotIn('ubi2-oc', workflow)
         self.assertIn("cron: '0 4 * * *'", workflow)
         block = step('inputs')['run']
-        self.assertLess(block.index('git clean -ffdx'), block.index('cp -f $DK_PROFILE/feeds.conf'))
+        self.assertNotIn('cp -f $DK_PROFILE/feeds.conf', block)
         self.assertNotIn('> version', block)
         custom = (ROOT / 'user/default/custom.sh').read_text()
         self.assertNotIn('OpenWRT-fanboy', custom)

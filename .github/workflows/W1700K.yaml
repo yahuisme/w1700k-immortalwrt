@@ -78,7 +78,6 @@ jobs:
           git clean -ffdx
           mountpoint $DK_BIN || { echo "::error::not mounted" >&2; exit 1; }
           ln -s $DK_BIN bin && ln -s /dlcache dl
-          cp -f $DK_PROFILE/feeds.conf feeds.conf
           ./scripts/feeds update -a >/dev/null || { echo "::error::feeds update failed"; exit 1; }
           ./scripts/feeds install -a >/dev/null || { echo "::error::feeds install failed"; exit 1; }
           cp $DK_PROFILE/config.diff .config

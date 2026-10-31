@@ -36,7 +36,6 @@ class SingleProfileTests(unittest.TestCase):
             (copied/'custom.sh').write_text('''#!/bin/bash
 set -e
 cmp .config "$EXPECTED"
-cmp feeds.conf "$DK_PROFILE/feeds.conf"
 diff -qr files "$DK_PROFILE/files"
 test "$DK_PROFILE" = "$EXPECTED_PROFILE"
 printf '%s\\n' custom >> "$LOG"
