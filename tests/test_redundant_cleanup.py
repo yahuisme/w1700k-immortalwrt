@@ -59,8 +59,7 @@ class RedundantCleanup(unittest.TestCase):
         libraries = re.findall(r'(/[^\s()]+)', subprocess.check_output(
             ['ldd', str(busybox)], text=True))
         config = ROOT / 'user/default/files/etc/sysctl.d'
-        # Removed filter toggles must remain whatever the operator/kernel supplied.
-        # The remaining call_* and pass-vlan-input-dev settings still load normally.
+        # Firmware defaults enable both filters without enabling AP compatibility.
         for initial in ('0', '1'):
             with self.subTest(initial=initial), tempfile.TemporaryDirectory() as tmp:
                 jail = Path(tmp)
@@ -92,7 +91,7 @@ class RedundantCleanup(unittest.TestCase):
                     self.assertEqual(result.returncode, 0, result.stderr)
                 bridge = jail / 'proc/sys/net/bridge'
                 for key in filters:
-                    self.assertEqual((bridge / key).read_text().strip(), initial)
+                    self.assertEqual((bridge / key).read_text().strip(), '1')
                 for family in ('iptables', 'ip6tables', 'arptables'):
                     self.assertEqual((bridge / ('bridge-nf-call-' + family)).read_text().strip(), '0')
                 self.assertEqual((bridge / 'bridge-nf-pass-vlan-input-dev').read_text().strip(), '1')
